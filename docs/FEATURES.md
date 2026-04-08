@@ -8,7 +8,7 @@
 
 | ID | Feature | Status | Description | Notes |
 |---|---|---|---|---|
-| F-001 | Synthesize active note | COMPLETE | Generate TTS for the current note only | Reading-view flow implemented in command and ribbon |
+| F-001 | Synthesize active note | COMPLETE | Generate TTS for the current note only | Reading-view flow implemented in command/ribbon; server now runs real Kokoro-82M synthesis |
 | F-002 | Sentence-level audio cache | COMPLETE | One temporary WAV per sentence | Plugin-managed session dirs under OS temp |
 | F-003 | Sequential playback | COMPLETE | Play sentence files in note order | Auto-advance on audio ended |
 | F-004 | Pause/resume | COMPLETE | Pause and continue current session | Command + ribbon support |

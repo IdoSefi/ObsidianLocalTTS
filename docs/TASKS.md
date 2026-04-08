@@ -9,7 +9,7 @@
 | ID | Task | Status | Owner | Depends On | Notes |
 |---|---|---|---|---|---|
 | T-001 | Create plugin scaffold under `plugin/` | DONE | agent | - | Starter scaffold already added |
-| T-002 | Create local Kokoro server under `server/` | DONE | agent | - | Starter FastAPI server already added |
+| T-002 | Create local Kokoro server under `server/` | DONE | agent | - | FastAPI server now performs real Kokoro-82M inference in `/synthesize` |
 | T-003 | Define shared request/response contract between plugin and server | DONE | agent | T-001,T-002 | Added `outputDir` to synthesis contract for plugin-managed temp cache |
 | T-004 | Implement note text extraction from active file | DONE | agent | T-001 | Uses Reading view rendered text (`contentEl.innerText`) in v1 |
 | T-005 | Implement sentence splitter | DONE | agent | T-004 | Regex-based v1 splitter with char ranges |
