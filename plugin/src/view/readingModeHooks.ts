@@ -25,7 +25,9 @@ export function registerReadingViewHooks(plugin: KokoroTtsPlugin): void {
       return;
     }
 
-    await plugin.playFromSentence(sentence.id);
-    new Notice(`Restarted from sentence ${sentence.id + 1}`);
+    const started = await plugin.playFromSentence(sentence.id);
+    if (started) {
+      new Notice(`Restarted from sentence ${sentence.id + 1}`);
+    }
   });
 }

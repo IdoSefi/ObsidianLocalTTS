@@ -25,3 +25,7 @@
 
 | F-014 | Kokoro audio diagnostics + silent-audio guardrails | COMPLETE | Adds direct Kokoro chunk diagnostics and rejects invalid/silent waveforms before writing WAV files | Includes explicit no-chunks/non-finite/all-zero/near-silent API errors and new debug scripts |
 | F-015 | Cross-platform debug WAV output path | COMPLETE | Direct Kokoro diagnostic saves output under OS temp instead of hardcoded `/tmp` | Prevents Windows failures when writing debug WAV artifacts |
+
+| F-016 | Synthesis progress + result notices | COMPLETE | Notices now report synthesis start, per-sentence progress, and final success/partial/failure counts | Includes ready/failed counters and clear no-ready playback notice |
+| F-017 | Status bar playback UI with seek slider | COMPLETE | Real status bar item shows idle/synth/playing/paused/stopped/failed and supports active-sentence slider seek | Powered by `HTMLAudioElement` metadata/time/state events |
+| F-018 | Temp folder and WAV session visibility | COMPLETE | Plugin logs current session temp folder and synthesized WAV count; command surfaces the active temp folder path | Command: "Show current Kokoro temp folder" |
