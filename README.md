@@ -62,7 +62,7 @@ Direct Kokoro (no HTTP) diagnostic:
 python server/debug_kokoro_direct.py
 ```
 
-This script runs `KPipeline` directly with `af_heart`, prints per-chunk/final waveform stats (shape, dtype, min/max, mean absolute amplitude, finite/zero checks), writes `/tmp/kokoro-direct-debug.wav`, and exits non-zero if it detects no chunks, all-zero, non-finite, or near-silent audio.
+This script runs `KPipeline` directly with `af_heart`, prints per-chunk/final waveform stats (shape, dtype, min/max, mean absolute amplitude, finite/zero checks), writes `kokoro-direct-debug.wav` under your OS temp directory, and exits non-zero if it detects no chunks, all-zero, non-finite, or near-silent audio.
 
 Optional multi-sentence test:
 

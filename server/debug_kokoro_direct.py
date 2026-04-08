@@ -4,6 +4,7 @@ from __future__ import annotations
 import sys
 import wave
 from pathlib import Path
+from tempfile import gettempdir
 
 import numpy as np
 
@@ -12,7 +13,7 @@ from kokoro import KPipeline
 SAMPLE_RATE = 24000
 VOICE = "af_heart"
 MEAN_ABS_NEAR_SILENT_THRESHOLD = 1e-5
-DEBUG_WAV_PATH = Path("/tmp/kokoro-direct-debug.wav")
+DEBUG_WAV_PATH = Path(gettempdir()) / "kokoro-direct-debug.wav"
 
 
 def compute_stats(audio: np.ndarray) -> dict[str, object]:
@@ -49,6 +50,7 @@ def print_stats(prefix: str, stats: dict[str, object]) -> None:
 
 
 def write_wav(path: Path, audio: np.ndarray) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     clipped = np.clip(audio, -1.0, 1.0)
     pcm16 = (clipped * np.iinfo(np.int16).max).astype(np.int16)
 
@@ -111,7 +113,12 @@ def main() -> int:
         )
         return 1
 
-    write_wav(DEBUG_WAV_PATH, concatenated)
+    try:
+        write_wav(DEBUG_WAV_PATH, concatenated)
+    except OSError as exc:
+        print(f"ERROR: failed to write debug WAV to {DEBUG_WAV_PATH}: {exc}", file=sys.stderr)
+        return 1
+
     print(f"Saved debug WAV: {DEBUG_WAV_PATH}")
     return 0
 
