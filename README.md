@@ -8,6 +8,7 @@ Personal-use Obsidian desktop plugin for local text-to-speech with sentence-leve
 - One temp WAV per sentence
 - Click a word to restart from that sentence
 - Pause/resume/stop
+- Visible synthesis + playback status UI (Notices + status bar + seek slider)
 - Temp files deleted on unload and cleaned on startup
 
 ## Project docs
@@ -80,3 +81,5 @@ npm run build
 ```
 
 Then copy/symlink `plugin/` into your vault under `.obsidian/plugins/obsidian-kokoro-tts/`, enable the plugin in Obsidian, keep server URL set to `http://127.0.0.1:8765`, switch to Reading view, and run **Synthesize active note**.
+
+During synthesis/playback, watch the Obsidian status bar for `Kokoro TTS` state (Idle, Synthesizing X/Y, Playing/Paused sentence X/Y, Stopped/Failed). The slider shows current sentence progress and supports seeking within the active sentence.
