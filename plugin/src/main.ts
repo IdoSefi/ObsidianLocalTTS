@@ -83,16 +83,23 @@ export default class KokoroTtsPlugin extends Plugin {
       return;
     }
 
-    const text = view.editor?.getValue() ?? view.data;
+    const text = view.contentEl.innerText ?? view.data;
     if (!text.trim()) {
       new Notice("The active note is empty");
       return;
     }
 
     this.sentences = splitIntoSentences(text);
+    if (this.sentences.length === 0) {
+      new Notice("No readable sentences found in the active note");
+      return;
+    }
     this.playback.setSentences(this.sentences);
 
-    const sessionId = this.cache.startSession();
+    this.stopPlayback();
+    await this.cache.cleanupCurrentSession();
+    const sessionId = await this.cache.startSession();
+    const outputDir = this.cache.getSessionFolder();
     if (!this.client) {
       new Notice("Kokoro client is not initialized");
       return;
@@ -112,6 +119,7 @@ export default class KokoroTtsPlugin extends Plugin {
         text: sentence.text,
         voice: this.settings.voice,
         speed: this.settings.speed,
+        outputDir,
       });
 
       if (!result.ok || !result.audioPath) {
@@ -124,7 +132,13 @@ export default class KokoroTtsPlugin extends Plugin {
       sentence.audioState = "ready";
     }
 
-    await this.playFromSentence(0);
+    const firstReadyIndex = this.sentences.findIndex((sentence) => sentence.audioState === "ready");
+    if (firstReadyIndex >= 0) {
+      await this.playFromSentence(firstReadyIndex);
+      return;
+    }
+
+    new Notice("Synthesis failed for all sentences");
   }
 
   async playFromSentence(index: number): Promise<void> {

@@ -22,6 +22,7 @@ class SynthesisRequest(BaseModel):
     text: str = Field(..., min_length=1)
     voice: str = Field(..., min_length=1)
     speed: float = Field(..., gt=0)
+    outputDir: str = Field(..., min_length=1)
 
 
 class SynthesisResponse(BaseModel):
@@ -39,7 +40,15 @@ def health() -> dict[str, str]:
 
 @app.post("/synthesize", response_model=SynthesisResponse)
 def synthesize(payload: SynthesisRequest) -> SynthesisResponse:
-    session_dir = CACHE_ROOT / payload.sessionId
+    session_dir = Path(payload.outputDir).resolve()
+    if not str(session_dir).startswith(str(Path(gettempdir()).resolve())):
+        return SynthesisResponse(
+            sessionId=payload.sessionId,
+            sentenceId=payload.sentenceId,
+            ok=False,
+            error="outputDir must be under system temp",
+        )
+
     session_dir.mkdir(parents=True, exist_ok=True)
     output_path = session_dir / f"sentence-{payload.sentenceId:04d}.wav"
 

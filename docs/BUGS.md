@@ -14,4 +14,4 @@
 
 | ID | Severity | Status | Summary | Repro Steps | Suspected Area | Notes |
 |---|---|---|---|---|---|---|
-| B-001 | P3 | OPEN | No bugs logged yet | - | - | Placeholder row; replace when real bugs appear |
+| B-001 | P2 | OPEN | Click-to-sentence mapping can be off in complex rendered Markdown layouts | Create a note with callouts/tables/footnotes; synthesize in Reading view; click inside nested rendered content and observe occasional wrong restart sentence | `plugin/src/sentence/mapping.ts` | v1 uses DOM caret/text-node approximation; acceptable for initial release but should be hardened |

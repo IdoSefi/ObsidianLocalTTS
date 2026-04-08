@@ -23,6 +23,7 @@ export interface SynthesisRequest {
   text: string;
   voice: string;
   speed: number;
+  outputDir: string;
 }
 
 export interface SynthesisResponse {
