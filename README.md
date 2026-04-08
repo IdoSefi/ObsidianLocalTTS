@@ -32,3 +32,43 @@ Personal-use Obsidian desktop plugin for local text-to-speech with sentence-leve
 ### Server
 - Run locally on the same machine as Obsidian
 - Provide a small HTTP API for sentence synthesis
+
+## Local run guide
+
+### 1) Run the FastAPI Kokoro server
+From the repo root:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r server/requirements.txt
+python server/app.py
+```
+
+The server listens on `http://127.0.0.1:8765` and exposes `GET /health` and `POST /synthesize`.
+
+### 2) Run the standalone synth test script
+With the server running:
+
+```bash
+python server/test_synthesize_request.py
+```
+
+This script prints the request payload, prints the response JSON, verifies the returned WAV path exists, and prints output file size.
+
+Optional multi-sentence test:
+
+```bash
+python server/test_multi_sentence_batch.py
+```
+
+### 3) Run the plugin against the local server
+Build the plugin:
+
+```bash
+cd plugin
+npm install
+npm run build
+```
+
+Then copy/symlink `plugin/` into your vault under `.obsidian/plugins/obsidian-kokoro-tts/`, enable the plugin in Obsidian, keep server URL set to `http://127.0.0.1:8765`, switch to Reading view, and run **Synthesize active note**.

@@ -105,15 +105,18 @@ export default class KokoroTtsPlugin extends Plugin {
       return;
     }
 
-    const healthy = await this.client.healthcheck();
-    if (!healthy) {
-      new Notice("Could not reach the local Kokoro server");
+    const health = await this.client.healthcheck();
+    console.info("[KokoroTTS] /health result", health);
+    if (!health.ok) {
+      const healthMessage = health.error ?? (health.status ? `HTTP ${health.status}` : "unknown error");
+      new Notice(`Kokoro server health check failed: ${healthMessage}`);
       return;
     }
 
     for (const sentence of this.sentences) {
       sentence.audioState = "generating";
-      const result = await this.client.synthesizeSentence({
+      console.info(`[KokoroTTS] Attempting /synthesize for sentence ${sentence.id + 1}`);
+      const { response: result, transportError, attempted } = await this.client.synthesizeSentence({
         sessionId,
         sentenceId: sentence.id,
         text: sentence.text,
@@ -122,9 +125,16 @@ export default class KokoroTtsPlugin extends Plugin {
         outputDir,
       });
 
+      console.info(`[KokoroTTS] /synthesize attempted=${attempted} sentence=${sentence.id + 1}`);
+      if (transportError) {
+        console.error(`[KokoroTTS] Transport error for sentence ${sentence.id + 1}: ${transportError}`);
+      }
+
       if (!result.ok || !result.audioPath) {
         sentence.audioState = "error";
-        new Notice(`Failed to synthesize sentence ${sentence.id + 1}`);
+        const reason = result.error ?? "unknown error";
+        console.error(`[KokoroTTS] Synthesis failed for sentence ${sentence.id + 1}: ${reason}`);
+        new Notice(`Failed to synthesize sentence ${sentence.id + 1}: ${reason}`);
         continue;
       }
 
