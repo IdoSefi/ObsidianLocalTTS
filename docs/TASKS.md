@@ -14,7 +14,7 @@
 | T-004 | Implement note text extraction from active file | DONE | agent | T-001 | Uses Reading view rendered text (`contentEl.innerText`) in v1 |
 | T-005 | Implement sentence splitter | DONE | agent | T-004 | Regex-based v1 splitter with char ranges |
 | T-006 | Implement temp session directory manager | DONE | agent | T-001 | Session folders under OS temp; current+stale cleanup implemented |
-| T-007 | Implement Kokoro client in plugin | DONE | agent | T-003,T-006 | Added synth + health requests with fetch error handling |
+| T-007 | Implement Kokoro client in plugin | DONE | agent | T-003,T-006 | Switched localhost transport to Obsidian `requestUrl()` and added detailed health/synthesize errors |
 | T-008 | Generate one WAV per sentence | DONE | agent | T-005,T-007 | Sequential per-sentence `/synthesize` calls and sentence state tracking |
 | T-009 | Implement sequential audio playback controller | DONE | agent | T-008 | HTMLAudio sequential sentence playback with auto-next |
 | T-010 | Implement pause/resume/stop commands | DONE | agent | T-009 | Command handlers wired in `main.ts` |
@@ -26,5 +26,7 @@
 | T-016 | Cleanup stale temp files on startup | DONE | agent | T-006 | Startup cleanup removes session dirs older than 24h |
 | T-017 | Add settings tab | IN_PROGRESS | agent | T-001 | Starter tab exists; needs polish and validation |
 | T-018 | Add core tests for splitter and mapping | TODO | agent | T-005,T-013 | |
-| T-019 | Add README setup instructions | TODO | agent | T-001,T-002 | |
+| T-019 | Add README setup instructions | DONE | agent | T-001,T-002 | Added server/plugin run steps and standalone synth test instructions |
 | T-020 | Final manual verification pass | TODO | agent | all | Record findings in BUGS.md |
+| T-021 | Add standalone server synth request test script | DONE | agent | T-002 | Added `server/test_synthesize_request.py` with payload/response/path-size validation |
+| T-022 | Add optional multi-sentence synth batch test script | DONE | agent | T-021 | Added `server/test_multi_sentence_batch.py` for sentence-by-sentence local API checks |

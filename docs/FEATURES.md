@@ -20,3 +20,5 @@
 | F-010 | Live Preview support | DEFERRED | Click handling in editor mode | Explicitly not v1 |
 | F-011 | Word-level timestamps | DEFERRED | Exact word alignment | Not needed for v1 |
 | F-012 | Streaming playback while generating | DEFERRED | Start early before all sentences finish | Nice-to-have only |
+
+| F-013 | Localhost transport via requestUrl | COMPLETE | Use Obsidian desktop HTTP transport for localhost Kokoro calls | Avoids desktop fetch/CORS failure path; logs health + synth attempt details |
