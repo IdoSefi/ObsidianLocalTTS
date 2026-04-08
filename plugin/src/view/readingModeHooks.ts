@@ -15,7 +15,7 @@ export function registerReadingViewHooks(plugin: KokoroTtsPlugin): void {
     }
 
     const root = activeView.contentEl;
-    const mapping = resolveRenderedClickToTextOffset(root, event.target);
+    const mapping = resolveRenderedClickToTextOffset(root, event.target, event);
     if (mapping.offset === null) {
       return;
     }

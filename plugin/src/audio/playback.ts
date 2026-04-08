@@ -1,4 +1,5 @@
 import type { SentenceChunk } from "../types";
+import { pathToFileURL } from "node:url";
 
 export class PlaybackController {
   private audio: HTMLAudioElement | null = null;
@@ -23,7 +24,7 @@ export class PlaybackController {
       return;
     }
 
-    const src = sentence.audioUrl ?? sentence.audioPath ?? "";
+    const src = sentence.audioUrl ?? (sentence.audioPath ? pathToFileURL(sentence.audioPath).toString() : "");
     this.audio = new Audio(src);
     this.audio.onended = () => {
       void this.playNext();

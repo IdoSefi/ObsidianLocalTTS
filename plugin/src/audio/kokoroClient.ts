@@ -4,11 +4,21 @@ export class KokoroClient {
   constructor(private readonly settings: PluginSettings) {}
 
   async synthesizeSentence(request: SynthesisRequest): Promise<SynthesisResponse> {
-    const response = await fetch(`${this.settings.serverUrl}/synthesize`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${this.settings.serverUrl}/synthesize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      });
+    } catch (error) {
+      return {
+        sessionId: request.sessionId,
+        sentenceId: request.sentenceId,
+        ok: false,
+        error: String(error),
+      };
+    }
 
     if (!response.ok) {
       return {
