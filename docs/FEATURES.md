@@ -22,3 +22,6 @@
 | F-012 | Streaming playback while generating | DEFERRED | Start early before all sentences finish | Nice-to-have only |
 
 | F-013 | Localhost transport via requestUrl | COMPLETE | Use Obsidian desktop HTTP transport for localhost Kokoro calls | Avoids desktop fetch/CORS failure path; logs health + synth attempt details |
+
+| F-014 | Kokoro audio diagnostics + silent-audio guardrails | COMPLETE | Adds direct Kokoro chunk diagnostics and rejects invalid/silent waveforms before writing WAV files | Includes explicit no-chunks/non-finite/all-zero/near-silent API errors and new debug scripts |
+| F-015 | Cross-platform debug WAV output path | COMPLETE | Direct Kokoro diagnostic saves output under OS temp instead of hardcoded `/tmp` | Prevents Windows failures when writing debug WAV artifacts |

@@ -54,7 +54,15 @@ With the server running:
 python server/test_synthesize_request.py
 ```
 
-This script prints the request payload, prints the response JSON, verifies the returned WAV path exists, and prints output file size.
+This script prints the request payload, response JSON, WAV path/size, WAV header metadata, PCM amplitude stats, and fails if the output appears effectively silent.
+
+Direct Kokoro (no HTTP) diagnostic:
+
+```bash
+python server/debug_kokoro_direct.py
+```
+
+This script runs `KPipeline` directly with `af_heart`, prints per-chunk/final waveform stats (shape, dtype, min/max, mean absolute amplitude, finite/zero checks), writes `kokoro-direct-debug.wav` under your OS temp directory, and exits non-zero if it detects no chunks, all-zero, non-finite, or near-silent audio.
 
 Optional multi-sentence test:
 
