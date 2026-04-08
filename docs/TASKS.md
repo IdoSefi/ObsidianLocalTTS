@@ -30,3 +30,4 @@
 | T-020 | Final manual verification pass | TODO | agent | all | Record findings in BUGS.md |
 | T-021 | Add standalone server synth request test script | DONE | agent | T-002 | Added `server/test_synthesize_request.py` with payload/response/path-size validation |
 | T-022 | Add optional multi-sentence synth batch test script | DONE | agent | T-021 | Added `server/test_multi_sentence_batch.py` for sentence-by-sentence local API checks |
+| T-023 | Add deep Kokoro waveform diagnostics and synthesis guards | DONE | agent | T-002,T-021 | Added direct Kokoro debug script, richer synth request WAV analysis, and server-side invalid/silent waveform rejection with explicit errors |

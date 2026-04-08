@@ -15,8 +15,14 @@ APP_NAME = "obsidian-kokoro-tts-server"
 CACHE_ROOT = Path(gettempdir()) / APP_NAME
 CACHE_ROOT.mkdir(parents=True, exist_ok=True)
 
+MEAN_ABS_NEAR_SILENT_THRESHOLD = 1e-5
+
 app = FastAPI(title=APP_NAME)
 _pipeline_cache: dict[str, KPipeline] = {}
+
+
+class AudioValidationError(ValueError):
+    pass
 
 
 class SynthesisRequest(BaseModel):
@@ -64,12 +70,19 @@ def synthesize(payload: SynthesisRequest) -> SynthesisResponse:
             speed=payload.speed,
         )
         write_wav_from_float_audio(output_path, audio=audio)
-    except Exception as exc:
+    except AudioValidationError as exc:
         return SynthesisResponse(
             sessionId=payload.sessionId,
             sentenceId=payload.sentenceId,
             ok=False,
             error=f"Kokoro synthesis failed: {exc}",
+        )
+    except Exception as exc:
+        return SynthesisResponse(
+            sessionId=payload.sessionId,
+            sentenceId=payload.sentenceId,
+            ok=False,
+            error=f"Kokoro synthesis failed: unexpected server error ({exc})",
         )
 
     return SynthesisResponse(
@@ -89,6 +102,31 @@ def get_pipeline_for_voice(voice: str) -> KPipeline:
     return pipeline
 
 
+def _validate_chunk(chunk: np.ndarray, *, chunk_index: int) -> None:
+    if chunk.size == 0:
+        raise AudioValidationError(f"empty audio chunk generated (chunk_index={chunk_index})")
+    if not np.isfinite(chunk).all():
+        raise AudioValidationError(f"non-finite audio chunk generated (chunk_index={chunk_index})")
+
+
+def _validate_final_audio(audio: np.ndarray) -> None:
+    if audio.size == 0:
+        raise AudioValidationError("no chunks generated")
+
+    if not np.isfinite(audio).all():
+        raise AudioValidationError("non-finite audio generated")
+
+    if np.all(audio == 0.0):
+        raise AudioValidationError("all-zero audio generated")
+
+    mean_abs_amplitude = float(np.mean(np.abs(audio)))
+    if mean_abs_amplitude <= MEAN_ABS_NEAR_SILENT_THRESHOLD:
+        raise AudioValidationError(
+            "near-silent audio generated "
+            f"(mean_abs_amplitude={mean_abs_amplitude:.8f}, threshold={MEAN_ABS_NEAR_SILENT_THRESHOLD:.8f})"
+        )
+
+
 def synthesize_kokoro_audio(
     pipeline: KPipeline,
     text: str,
@@ -96,19 +134,26 @@ def synthesize_kokoro_audio(
     speed: float,
 ) -> np.ndarray:
     chunks: list[np.ndarray] = []
-    for _graphemes, _phonemes, audio in pipeline(
-        text,
-        voice=voice,
-        speed=speed,
+    for chunk_index, (_graphemes, _phonemes, audio) in enumerate(
+        pipeline(
+            text,
+            voice=voice,
+            speed=speed,
+        )
     ):
         if audio is None:
             continue
-        chunks.append(np.asarray(audio, dtype=np.float32))
+
+        chunk = np.asarray(audio, dtype=np.float32)
+        _validate_chunk(chunk, chunk_index=chunk_index)
+        chunks.append(chunk)
 
     if not chunks:
-        raise ValueError("no audio generated")
+        raise AudioValidationError("no chunks generated")
 
-    return np.concatenate(chunks)
+    concatenated = np.concatenate(chunks)
+    _validate_final_audio(concatenated)
+    return concatenated
 
 
 def write_wav_from_float_audio(path: Path, audio: np.ndarray, sample_rate: int = 24000) -> None:
