@@ -22,3 +22,6 @@
 | B-005 | P2 | FIXED | `server/debug_kokoro_direct.py` failed on Windows with `FileNotFoundError` for `\tmp\kokoro-direct-debug.wav` | Run script on Windows; synth succeeds but write step fails because hardcoded POSIX path is invalid | `server/debug_kokoro_direct.py` | Fixed by using `tempfile.gettempdir()` and creating parent directories before writing WAV |
 
 | B-006 | P2 | FIXED | Playback/synthesis had low visibility, making successful synthesis and active playback unclear | Synthesize a note and observe little/no UI feedback in prior build | `plugin/src/main.ts`, `plugin/src/ui/status.ts`, `plugin/src/audio/playback.ts` | Fixed by synthesis progress notices, status bar states, playback progress slider, missing-audio notices, and session WAV/path logging |
+
+| B-007 | P1 | FIXED | Playback failed with "Not allowed to load local resource" for `file:///.../Temp/...wav` on desktop | Synthesize successfully, then autoplay from temp WAV path on Windows; prior build attempted direct `file://` audio URL and playback never started | `plugin/src/audio/playback.ts` | Fixed by loading WAV bytes from disk and playing via Blob object URL (`URL.createObjectURL`) with URL cleanup on stop |
+

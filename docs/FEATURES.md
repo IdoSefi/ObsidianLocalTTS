@@ -29,3 +29,6 @@
 | F-016 | Synthesis progress + result notices | COMPLETE | Notices now report synthesis start, per-sentence progress, and final success/partial/failure counts | Includes ready/failed counters and clear no-ready playback notice |
 | F-017 | Status bar playback UI with seek slider | COMPLETE | Real status bar item shows idle/synth/playing/paused/stopped/failed and supports active-sentence slider seek | Powered by `HTMLAudioElement` metadata/time/state events |
 | F-018 | Temp folder and WAV session visibility | COMPLETE | Plugin logs current session temp folder and synthesized WAV count; command surfaces the active temp folder path | Command: "Show current Kokoro temp folder" |
+
+| F-019 | Cross-platform local temp WAV playback source | COMPLETE | Playback now reads sentence WAV bytes and uses Blob object URLs instead of `file://` URLs | Avoids Electron/Chromium local-resource blocking on Windows temp paths |
+

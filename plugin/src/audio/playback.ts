@@ -1,5 +1,4 @@
-import { existsSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { existsSync, readFileSync } from "node:fs";
 import type { SentenceChunk } from "../types";
 
 export type PlaybackState = "idle" | "playing" | "paused" | "stopped" | "failed";
@@ -28,6 +27,7 @@ export class PlaybackController {
   private currentIndex = 0;
   private sentences: SentenceChunk[] = [];
   private callbacks: PlaybackControllerCallbacks = {};
+  private currentObjectUrl: string | null = null;
 
   setSentences(sentences: SentenceChunk[]): void {
     this.sentences = sentences;
@@ -53,18 +53,13 @@ export class PlaybackController {
       return false;
     }
 
-    if (sentence.audioPath && !existsSync(sentence.audioPath)) {
-      this.emitState("failed", `Audio file does not exist: ${sentence.audioPath}`);
+    const source = this.getPlayableSource(sentence);
+    if (!source.ok) {
+      this.emitState("failed", source.error);
       return false;
     }
 
-    const src = sentence.audioUrl ?? (sentence.audioPath ? pathToFileURL(sentence.audioPath).toString() : "");
-    if (!src) {
-      this.emitState("failed", "Audio source URL is invalid");
-      return false;
-    }
-
-    this.audio = new Audio(src);
+    this.audio = new Audio(source.src);
     this.audio.addEventListener("loadedmetadata", () => {
       this.emitProgress();
     });
@@ -139,7 +134,39 @@ export class PlaybackController {
       this.audio.currentTime = 0;
       this.audio = null;
     }
+
+    if (this.currentObjectUrl) {
+      URL.revokeObjectURL(this.currentObjectUrl);
+      this.currentObjectUrl = null;
+    }
+
     this.emitState("stopped");
+  }
+
+  private getPlayableSource(sentence: SentenceChunk):
+    | { ok: true; src: string }
+    | { ok: false; error: string } {
+    if (sentence.audioUrl) {
+      return { ok: true, src: sentence.audioUrl };
+    }
+
+    if (!sentence.audioPath) {
+      return { ok: false, error: "Missing audio path" };
+    }
+
+    if (!existsSync(sentence.audioPath)) {
+      return { ok: false, error: `Audio file does not exist: ${sentence.audioPath}` };
+    }
+
+    try {
+      const wavBuffer = readFileSync(sentence.audioPath);
+      const wavBlob = new Blob([wavBuffer], { type: "audio/wav" });
+      this.currentObjectUrl = URL.createObjectURL(wavBlob);
+      return { ok: true, src: this.currentObjectUrl };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { ok: false, error: `Unable to load WAV for playback: ${message}` };
+    }
   }
 
   private emitProgress(): void {

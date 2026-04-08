@@ -33,4 +33,5 @@
 | T-023 | Add deep Kokoro waveform diagnostics and synthesis guards | DONE | agent | T-002,T-021 | Added direct Kokoro debug script, richer synth request WAV analysis, and server-side invalid/silent waveform rejection with explicit errors |
 | T-024 | Make Kokoro direct debug WAV output path cross-platform | DONE | agent | T-023 | Switched debug output to `tempfile.gettempdir()` and auto-create parent dir to avoid Windows `\tmp` path failures |
 | T-025 | Add synthesis/playback status UI with progress slider | DONE | agent | T-009,T-011 | Added status bar states, synthesis progress notices, playback time slider/seek, and temp-folder visibility command |
+| T-026 | Fix Windows playback blocked by file:// local resource loading | DONE | agent | T-025 | Switched playback source from file:// paths to in-memory Blob object URLs created from WAV bytes |
 
