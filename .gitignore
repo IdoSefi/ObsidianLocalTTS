@@ -1,0 +1,24 @@
+# Node / plugin
+plugin/node_modules/
+plugin/main.js
+plugin/*.tsbuildinfo
+plugin/dist/
+plugin/.obsidian/
+
+# Python / server
+server/.venv/
+server/__pycache__/
+server/.pytest_cache/
+server/*.pyc
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Temp / generated audio
+.tmp/
+temp/
+*.wav
+*.pcm

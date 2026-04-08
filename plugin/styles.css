@@ -1,0 +1,10 @@
+.kokoro-tts-status-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.kokoro-tts-playing-sentence {
+  outline: 1px solid var(--interactive-accent);
+  border-radius: 4px;
+}

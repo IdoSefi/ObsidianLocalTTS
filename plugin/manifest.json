@@ -1,0 +1,9 @@
+{
+  "id": "obsidian-kokoro-tts",
+  "name": "Obsidian Kokoro TTS",
+  "version": "0.0.1",
+  "minAppVersion": "1.5.0",
+  "description": "Personal-use local TTS plugin for Obsidian using a local Kokoro server.",
+  "author": "ido sefi",
+  "isDesktopOnly": true
+}
