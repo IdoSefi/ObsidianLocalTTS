@@ -2,18 +2,21 @@ from __future__ import annotations
 
 from pathlib import Path
 from tempfile import gettempdir
-import wave
-import struct
 from typing import Optional
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
+import numpy as np
+import wave
+
+from kokoro import KPipeline
 
 APP_NAME = "obsidian-kokoro-tts-server"
 CACHE_ROOT = Path(gettempdir()) / APP_NAME
 CACHE_ROOT.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title=APP_NAME)
+_pipeline_cache: dict[str, KPipeline] = {}
 
 
 class SynthesisRequest(BaseModel):
@@ -52,9 +55,22 @@ def synthesize(payload: SynthesisRequest) -> SynthesisResponse:
     session_dir.mkdir(parents=True, exist_ok=True)
     output_path = session_dir / f"sentence-{payload.sentenceId:04d}.wav"
 
-    # Placeholder implementation.
-    # Codex should replace this with real Kokoro-82M inference.
-    write_silent_wav(output_path, duration_seconds=min(max(len(payload.text) * 0.03, 0.2), 3.0))
+    try:
+        pipeline = get_pipeline_for_voice(payload.voice)
+        audio = synthesize_kokoro_audio(
+            pipeline=pipeline,
+            text=payload.text,
+            voice=payload.voice,
+            speed=payload.speed,
+        )
+        write_wav_from_float_audio(output_path, audio=audio)
+    except Exception as exc:
+        return SynthesisResponse(
+            sessionId=payload.sessionId,
+            sentenceId=payload.sentenceId,
+            ok=False,
+            error=f"Kokoro synthesis failed: {exc}",
+        )
 
     return SynthesisResponse(
         sessionId=payload.sessionId,
@@ -64,14 +80,46 @@ def synthesize(payload: SynthesisRequest) -> SynthesisResponse:
     )
 
 
-def write_silent_wav(path: Path, duration_seconds: float, sample_rate: int = 22050) -> None:
-    n_frames = int(duration_seconds * sample_rate)
+def get_pipeline_for_voice(voice: str) -> KPipeline:
+    lang_code = voice[0].lower() if voice else "a"
+    pipeline = _pipeline_cache.get(lang_code)
+    if pipeline is None:
+        pipeline = KPipeline(lang_code=lang_code)
+        _pipeline_cache[lang_code] = pipeline
+    return pipeline
+
+
+def synthesize_kokoro_audio(
+    pipeline: KPipeline,
+    text: str,
+    voice: str,
+    speed: float,
+) -> np.ndarray:
+    chunks: list[np.ndarray] = []
+    for _graphemes, _phonemes, audio in pipeline(
+        text,
+        voice=voice,
+        speed=speed,
+    ):
+        if audio is None:
+            continue
+        chunks.append(np.asarray(audio, dtype=np.float32))
+
+    if not chunks:
+        raise ValueError("no audio generated")
+
+    return np.concatenate(chunks)
+
+
+def write_wav_from_float_audio(path: Path, audio: np.ndarray, sample_rate: int = 24000) -> None:
+    clipped = np.clip(audio, -1.0, 1.0)
+    pcm16 = (clipped * np.int16(np.iinfo(np.int16).max)).astype(np.int16)
+
     with wave.open(str(path), "w") as wav_file:
         wav_file.setnchannels(1)
         wav_file.setsampwidth(2)
         wav_file.setframerate(sample_rate)
-        silence = struct.pack("<h", 0)
-        wav_file.writeframes(silence * n_frames)
+        wav_file.writeframes(pcm16.tobytes())
 
 
 if __name__ == "__main__":
