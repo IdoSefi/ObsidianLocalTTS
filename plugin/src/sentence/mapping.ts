@@ -31,18 +31,19 @@ export function resolveRenderedClickToTextOffset(
       clickNode = caret.offsetNode;
       clickOffset = caret.offset;
     }
-  } else if ("caretRangeFromPoint" in document && document.caretRangeFromPoint) {
+  }
+
+  if (!clickNode && "caretRangeFromPoint" in document && document.caretRangeFromPoint) {
     const caretRange = document.caretRangeFromPoint(event.clientX, event.clientY);
     if (caretRange) {
       clickNode = caretRange.startContainer;
       clickOffset = caretRange.startOffset;
     }
-  } else if (target.nodeType === Node.TEXT_NODE) {
-    clickNode = target;
-    clickOffset = 0;
-  } else {
+  }
+
+  if (!clickNode) {
     // Reading view often does not place a caret on click.
-    // Fall back to the clicked element so we can approximate an offset.
+    // Fall back to the clicked node so we can approximate an offset.
     clickNode = target;
     clickOffset = 0;
   }

@@ -17,11 +17,21 @@ export function registerReadingViewHooks(plugin: KokoroTtsPlugin): void {
     const root = activeView.contentEl;
     const mapping = resolveRenderedClickToTextOffset(root, event.target, event);
     if (mapping.offset === null) {
+      console.debug("[KokoroTTS][debug] Click mapping failed: offset was null", {
+        target: event.target,
+        mode: activeView.getMode(),
+      });
+      new Notice("debug: click mapping failed (offset null)");
       return;
     }
 
     const sentence = findSentenceByOffset(plugin.getSentences(), mapping.offset);
     if (!sentence) {
+      console.debug("[KokoroTTS][debug] Click mapped offset but no sentence matched", {
+        offset: mapping.offset,
+        sentenceCount: plugin.getSentences().length,
+      });
+      new Notice(`debug: no sentence for offset ${mapping.offset}`);
       return;
     }
 
