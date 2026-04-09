@@ -1,3 +1,5 @@
+import { promises as fs } from "node:fs";
+import { tmpdir } from "node:os";
 import { basename, extname, join } from "node:path";
 import { App, FileSystemAdapter, normalizePath } from "obsidian";
 import type { CachedSentenceAudio, NoteSynthesisManifest } from "../types";
@@ -5,6 +7,7 @@ import type { CachedSentenceAudio, NoteSynthesisManifest } from "../types";
 const ROOT_FOLDER = "audio_synthesis";
 const MANIFEST_FILE = "manifest.json";
 const SENTENCE_FILE_REGEX = /^sentence-(\d+)\.wav$/i;
+const STAGING_ROOT = join(tmpdir(), "obsidian-kokoro-tts-staging");
 
 export interface PrepareNoteFolderResult {
   noteFolderPath: string;
@@ -39,8 +42,35 @@ export class VaultAudioCache {
     await this.ensureFolderExists(noteFolderPath);
     return {
       noteFolderPath,
-      absoluteFolderPath: this.toAbsolutePath(noteFolderPath),
+      absoluteFolderPath: this.getAbsolutePathForVaultPath(noteFolderPath),
     };
+  }
+
+  async prepareTempSynthesisFolder(notePath: string, replaceExisting: boolean): Promise<string> {
+    const tempFolder = this.getTempSynthesisFolder(notePath);
+    if (replaceExisting) {
+      await fs.rm(tempFolder, { recursive: true, force: true });
+    }
+    await fs.mkdir(tempFolder, { recursive: true });
+    return tempFolder;
+  }
+
+  async clearTempSynthesisFolder(notePath: string): Promise<void> {
+    await fs.rm(this.getTempSynthesisFolder(notePath), { recursive: true, force: true });
+  }
+
+  getSentenceAudioVaultPath(notePath: string, sentenceId: number): string {
+    const noteFolder = this.getNoteSynthesisFolder(notePath);
+    const oneBased = sentenceId + 1;
+    return normalizePath(`${noteFolder}/sentence-${String(oneBased).padStart(4, "0")}.wav`);
+  }
+
+  getSentenceAudioAbsolutePath(notePath: string, sentenceId: number): string {
+    return this.getAbsolutePathForVaultPath(this.getSentenceAudioVaultPath(notePath, sentenceId));
+  }
+
+  getAbsolutePathForVaultPath(vaultPath: string): string {
+    return this.toAbsolutePath(vaultPath);
   }
 
   async listExistingSentenceAudio(notePath: string): Promise<ExistingSentenceAudioResult> {
@@ -92,12 +122,6 @@ export class VaultAudioCache {
     await this.app.vault.adapter.rmdir(folder, true);
   }
 
-  getSentenceAudioVaultPath(notePath: string, sentenceId: number): string {
-    const noteFolder = this.getNoteSynthesisFolder(notePath);
-    const oneBased = sentenceId + 1;
-    return normalizePath(`${noteFolder}/sentence-${String(oneBased).padStart(4, "0")}.wav`);
-  }
-
   async writeManifest(notePath: string, manifest: NoteSynthesisManifest): Promise<void> {
     const manifestPath = normalizePath(`${this.getNoteSynthesisFolder(notePath)}/${MANIFEST_FILE}`);
     await this.app.vault.adapter.write(manifestPath, JSON.stringify(manifest, null, 2));
@@ -115,6 +139,10 @@ export class VaultAudioCache {
     } catch {
       return null;
     }
+  }
+
+  private getTempSynthesisFolder(notePath: string): string {
+    return join(STAGING_ROOT, this.getSafeNoteFolderName(notePath));
   }
 
   private async ensureFolderExists(folder: string): Promise<void> {

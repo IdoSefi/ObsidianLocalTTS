@@ -35,3 +35,5 @@
 | T-027 | Add persistent per-note synthesis cache in vault | DONE | agent | T-006,T-008 | Added `audio_synthesis/` storage with per-note hashed folder names and manifest |
 | T-028 | Split synthesize vs play-cached flows | DONE | agent | T-027,T-010 | Added dedicated Play command and idle pause/resume fallback to cached playback |
 | T-029 | Auto-start playback during ongoing synthesis | DONE | agent | T-027,T-009 | Playback starts on first ready sentence and waits for not-yet-ready following sentences |
+
+| T-030 | Add temp-staging bridge for server outputDir restriction | DONE | agent | T-027 | Synthesize now writes to system temp staging and copies WAVs into vault cache per sentence |

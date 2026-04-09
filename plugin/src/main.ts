@@ -1,3 +1,5 @@
+import { promises as fs } from "node:fs";
+import { dirname } from "node:path";
 import { MarkdownView, Notice, Plugin } from "obsidian";
 import { VaultAudioCache } from "./audio/cache";
 import { KokoroClient } from "./audio/kokoroClient";
@@ -140,6 +142,7 @@ export default class KokoroTtsPlugin extends Plugin {
     const total = this.sentences.length;
     const notePath = prepared.notePath;
     const folder = await this.cache.prepareNoteSynthesisFolder(notePath, true);
+    const tempOutputDir = await this.cache.prepareTempSynthesisFolder(notePath, true);
     const sessionId = `note-${Date.now()}`;
 
     await this.cache.writeManifest(notePath, this.buildManifest(notePath, this.sentences));
@@ -173,7 +176,7 @@ export default class KokoroTtsPlugin extends Plugin {
           text: sentence.text,
           voice: this.settings.voice,
           speed: this.settings.speed,
-          outputDir: folder.absoluteFolderPath,
+          outputDir: tempOutputDir,
         });
 
         if (!result.ok || !result.audioPath) {
@@ -184,7 +187,11 @@ export default class KokoroTtsPlugin extends Plugin {
           continue;
         }
 
-        sentence.audioPath = result.audioPath;
+        const persistentAudioPath = this.cache.getSentenceAudioAbsolutePath(notePath, sentence.id);
+        await fs.mkdir(dirname(persistentAudioPath), { recursive: true });
+        await fs.copyFile(result.audioPath, persistentAudioPath);
+
+        sentence.audioPath = persistentAudioPath;
         sentence.audioState = "ready";
         readyCount += 1;
 
@@ -199,6 +206,7 @@ export default class KokoroTtsPlugin extends Plugin {
       }
     } finally {
       this.isSynthesizing = false;
+      await this.cache.clearTempSynthesisFolder(notePath);
       await this.cache.writeManifest(notePath, this.buildManifest(notePath, this.sentences));
     }
 

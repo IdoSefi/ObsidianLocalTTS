@@ -33,6 +33,8 @@ For each note, synthesis is stored inside your vault:
 
 `<note-folder>` is a Windows-safe folder name derived from the note path plus a short hash so notes with the same filename in different folders do not collide.
 
+During synthesis, the plugin may use a system-temp staging folder for server compatibility, then copies each completed WAV into this vault cache location.
+
 ## Project docs
 - `AGENTS.md` — repo rules for coding agents
 - `docs/PLAN.md` — main implementation plan

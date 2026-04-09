@@ -65,6 +65,7 @@ Build a personal-use Obsidian desktop plugin that:
 - Server language: Python
 - Audio format: WAV for simplicity
 - Cache location: vault-managed folder `audio_synthesis/`
+- Server compatibility write path: system-temp staging folder per note, then copy to vault cache
 - Note cache layout:
   - `audio_synthesis/<windows-safe-note-key>/sentence-0001.wav`
   - `audio_synthesis/<windows-safe-note-key>/manifest.json`
