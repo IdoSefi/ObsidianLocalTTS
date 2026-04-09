@@ -30,6 +30,13 @@ export default class KokoroTtsPlugin extends Plugin {
       this.playback.seekTo(seconds);
     });
 
+    this.statusView.setPlayPauseHandler(() => {
+      void this.togglePauseResume();
+    });
+    this.statusView.setStopHandler(() => {
+      this.stopPlayback();
+    });
+
     this.playback.setCallbacks({
       onProgress: ({ currentTime, duration }) => {
         this.statusView?.setProgress(currentTime, duration);

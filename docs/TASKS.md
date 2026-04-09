@@ -38,3 +38,4 @@
 
 | T-030 | Add temp-staging bridge for server outputDir restriction | DONE | agent | T-027 | Synthesize now writes to system temp staging and copies WAVs into vault cache per sentence |
 | T-031 | Fix Blob URL revocation race causing playback ERR_FILE_NOT_FOUND | DONE | agent | T-009 | Removed redundant audio cleanup call before creating new Audio so Blob URL remains valid for playback |
+| T-032 | Add status-bar play/stop buttons beside slider | DONE | agent | T-025 | Added status bar buttons wired to pause/resume/play and stop actions next to seek slider |

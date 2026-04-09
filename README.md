@@ -11,7 +11,7 @@ Personal-use Obsidian desktop plugin for local text-to-speech with sentence-leve
 - Distinct **Synthesize** vs **Play cached** flows
 - Pause/resume/stop
 - Playback can start while synthesis is still ongoing
-- Visible synthesis + playback status UI (Notices + status bar + seek slider)
+- Visible synthesis + playback status UI (Notices + status bar + seek slider + play/stop buttons)
 
 ## Synthesize vs Play behavior
 - **Synthesize active note**
@@ -106,4 +106,4 @@ npm run build
 
 Then copy/symlink `plugin/` into your vault under `.obsidian/plugins/obsidian-kokoro-tts/`, enable the plugin in Obsidian, keep server URL set to `http://127.0.0.1:8765`, switch to Reading view, and run **Synthesize active note**.
 
-During synthesis/playback, watch the Obsidian status bar for `Kokoro TTS` state (Idle, Synthesizing X/Y, Playing/Paused sentence X/Y, Stopped/Failed). The slider shows current sentence progress and supports seeking within the active sentence.
+During synthesis/playback, watch the Obsidian status bar for `Kokoro TTS` state (Idle, Synthesizing X/Y, Playing/Paused sentence X/Y, Stopped/Failed). The slider shows current sentence progress and supports seeking within the active sentence, and the play/stop buttons appear next to the slider for quick controls.

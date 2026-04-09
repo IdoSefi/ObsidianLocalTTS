@@ -25,3 +25,4 @@
 
 | F-015 | Temp staging bridge for synthesis writes | COMPLETE | Server writes sentence WAVs into system-temp staging, then plugin copies each WAV into vault `audio_synthesis/` cache | Keeps persistent vault cache while honoring server outputDir safety constraint |
 | F-016 | Stable Blob URL playback lifecycle | COMPLETE | Prevents revoking newly created blob audio URL before `Audio` consumes it | Fixes intermittent/constant `ERR_FILE_NOT_FOUND` during sentence playback |
+| F-017 | Status bar play/stop controls | COMPLETE | Added play/pause and stop buttons directly beside the status slider for quick access | Buttons call existing playback commands from status bar |

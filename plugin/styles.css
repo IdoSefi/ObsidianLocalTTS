@@ -1,7 +1,20 @@
-.kokoro-tts-status-bar {
+.kokoro-tts-status {
   display: flex;
-  gap: 8px;
   align-items: center;
+  gap: 8px;
+}
+
+.kokoro-tts-status-slider {
+  width: 140px;
+}
+
+.kokoro-tts-status-button {
+  width: 24px;
+  height: 24px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .kokoro-tts-playing-sentence {
