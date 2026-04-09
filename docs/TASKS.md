@@ -43,3 +43,4 @@
 | T-034 | Restore visible click feedback notice for Reading-view jump | DONE | agent | T-014,T-033 | Clicking mapped sentence now immediately shows "start reading from sentence N" notice before jump/wait handling |
 | T-035 | Make Reading-view click mapping work without caret placement | DONE | agent | T-013,T-034 | Added non-caret fallback mapping path for element targets so word clicks resolve sentence offsets in Reading view |
 | T-036 | Fix caret-API short-circuit in click mapping and add temporary debug notices | DONE | agent | T-035 | Mapping now falls back when caret API exists but returns null; temporary debug notices/logs added for unmapped clicks |
+| T-037 | Resolve "no sentence for offset" by nearest-sentence fallback | DONE | agent | T-036 | Click hook now falls back to nearest sentence when mapped offset lands outside trimmed sentence ranges |

@@ -14,6 +14,16 @@ function textLengthFromNode(node: Node): number {
   return sum;
 }
 
+function findFirstTextDescendant(node: Node): Node | null {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return node;
+  }
+
+  const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+  const next = walker.nextNode();
+  return next ?? null;
+}
+
 export function resolveRenderedClickToTextOffset(
   root: HTMLElement,
   target: EventTarget | null,
@@ -46,6 +56,14 @@ export function resolveRenderedClickToTextOffset(
     // Fall back to the clicked node so we can approximate an offset.
     clickNode = target;
     clickOffset = 0;
+  }
+
+  if (clickNode.nodeType !== Node.TEXT_NODE) {
+    const textDescendant = findFirstTextDescendant(clickNode);
+    if (textDescendant) {
+      clickNode = textDescendant;
+      clickOffset = 0;
+    }
   }
 
   if (!clickNode || !root.contains(clickNode)) {

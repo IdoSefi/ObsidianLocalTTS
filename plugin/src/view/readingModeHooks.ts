@@ -1,7 +1,7 @@
 import { MarkdownView, Notice } from "obsidian";
 import type KokoroTtsPlugin from "../main";
 import { resolveRenderedClickToTextOffset } from "../sentence/mapping";
-import { findSentenceByOffset } from "../sentence/splitter";
+import { findNearestSentenceByOffset, findSentenceByOffset } from "../sentence/splitter";
 
 export function registerReadingViewHooks(plugin: KokoroTtsPlugin): void {
   plugin.registerDomEvent(document, "click", async (event) => {
@@ -25,17 +25,27 @@ export function registerReadingViewHooks(plugin: KokoroTtsPlugin): void {
       return;
     }
 
-    const sentence = findSentenceByOffset(plugin.getSentences(), mapping.offset);
-    if (!sentence) {
+    const sentences = plugin.getSentences();
+    const sentence = findSentenceByOffset(sentences, mapping.offset);
+    const resolvedSentence = sentence ?? findNearestSentenceByOffset(sentences, mapping.offset);
+    if (!resolvedSentence) {
       console.debug("[KokoroTTS][debug] Click mapped offset but no sentence matched", {
         offset: mapping.offset,
-        sentenceCount: plugin.getSentences().length,
+        sentenceCount: sentences.length,
       });
       new Notice(`debug: no sentence for offset ${mapping.offset}`);
       return;
     }
 
-    new Notice(`start reading from sentence ${sentence.id + 1}`);
-    await plugin.requestPlaybackFromSentence(sentence.id);
+    if (!sentence) {
+      console.debug("[KokoroTTS][debug] Using nearest sentence fallback for click offset", {
+        offset: mapping.offset,
+        sentenceId: resolvedSentence.id,
+      });
+      new Notice(`debug: nearest sentence fallback for offset ${mapping.offset}`);
+    }
+
+    new Notice(`start reading from sentence ${resolvedSentence.id + 1}`);
+    await plugin.requestPlaybackFromSentence(resolvedSentence.id);
   });
 }
