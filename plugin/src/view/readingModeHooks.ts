@@ -1,4 +1,4 @@
-import { MarkdownView, Notice } from "obsidian";
+import { MarkdownView } from "obsidian";
 import type KokoroTtsPlugin from "../main";
 import { resolveRenderedClickToTextOffset } from "../sentence/mapping";
 import { findSentenceByOffset } from "../sentence/splitter";
@@ -25,9 +25,6 @@ export function registerReadingViewHooks(plugin: KokoroTtsPlugin): void {
       return;
     }
 
-    const started = await plugin.playFromSentence(sentence.id, true);
-    if (started) {
-      new Notice(`Restarted from sentence ${sentence.id + 1}`);
-    }
+    await plugin.requestPlaybackFromSentence(sentence.id);
   });
 }

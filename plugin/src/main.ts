@@ -19,6 +19,7 @@ export default class KokoroTtsPlugin extends Plugin {
   private sentences: SentenceChunk[] = [];
   private isPaused = false;
   private isSynthesizing = false;
+  private pendingPlaybackSentenceId: number | null = null;
   private statusView: StatusView | null = null;
 
   async onload(): Promise<void> {
@@ -54,7 +55,11 @@ export default class KokoroTtsPlugin extends Plugin {
           return;
         }
         if (state === "stopped") {
-          this.statusView?.setStopped();
+          if (this.pendingPlaybackSentenceId !== null) {
+            this.statusView?.setWaitingForSentence(this.pendingPlaybackSentenceId + 1);
+          } else {
+            this.statusView?.setStopped();
+          }
           this.isPaused = false;
           return;
         }
@@ -191,6 +196,7 @@ export default class KokoroTtsPlugin extends Plugin {
           failedCount += 1;
           const reason = result.error ?? "unknown error";
           console.error(`[KokoroTTS] Synthesis failed for sentence ${sentence.id + 1}: ${reason}`);
+          await this.tryStartPendingPlayback();
           continue;
         }
 
@@ -201,8 +207,9 @@ export default class KokoroTtsPlugin extends Plugin {
         sentence.audioPath = persistentAudioPath;
         sentence.audioState = "ready";
         readyCount += 1;
+        await this.tryStartPendingPlayback();
 
-        if (!playbackStarted) {
+        if (!playbackStarted && this.pendingPlaybackSentenceId === null) {
           playbackStarted = await this.playFromSentence(sentence.id, true);
           if (playbackStarted && sentence.id > 0) {
             console.info(
@@ -219,7 +226,7 @@ export default class KokoroTtsPlugin extends Plugin {
 
     new Notice(`Synthesis complete: ${readyCount} ready, ${failedCount} failed`);
 
-    if (!playbackStarted && readyCount > 0) {
+    if (!playbackStarted && readyCount > 0 && this.pendingPlaybackSentenceId === null) {
       const firstReadyIndex = this.sentences.findIndex((sentence) => sentence.audioState === "ready");
       if (firstReadyIndex >= 0) {
         await this.playFromSentence(firstReadyIndex);
@@ -311,6 +318,80 @@ export default class KokoroTtsPlugin extends Plugin {
     return true;
   }
 
+  async requestPlaybackFromSentence(sentenceId: number): Promise<void> {
+    const sentence = this.sentences[sentenceId];
+    if (!sentence) {
+      new Notice("Invalid sentence index for playback");
+      this.statusView?.setFailed("Invalid sentence");
+      return;
+    }
+
+    this.playback.stop();
+    this.isPaused = false;
+
+    if (sentence.audioState === "error") {
+      this.clearPendingPlaybackTarget();
+      this.statusView?.setFailed(`Sentence ${sentenceId + 1} failed synthesis`);
+      new Notice(`Sentence ${sentenceId + 1} failed synthesis`);
+      return;
+    }
+
+    if (sentence.audioState === "ready") {
+      this.clearPendingPlaybackTarget();
+      const started = await this.playFromSentence(sentenceId);
+      if (started) {
+        new Notice(`Restarted from sentence ${sentenceId + 1}`);
+      }
+      return;
+    }
+
+    if (!this.isSynthesizing) {
+      this.clearPendingPlaybackTarget();
+      this.statusView?.setFailed(`Sentence ${sentenceId + 1} is not ready`);
+      new Notice(`Sentence ${sentenceId + 1} is not ready for playback`);
+      return;
+    }
+
+    this.pendingPlaybackSentenceId = sentenceId;
+    this.statusView?.setWaitingForSentence(sentenceId + 1);
+    new Notice(`Waiting for sentence ${sentenceId + 1} to finish generating`);
+  }
+
+  async tryStartPendingPlayback(): Promise<void> {
+    if (this.pendingPlaybackSentenceId === null) {
+      return;
+    }
+
+    const sentenceId = this.pendingPlaybackSentenceId;
+    const sentence = this.sentences[sentenceId];
+    if (!sentence) {
+      this.clearPendingPlaybackTarget();
+      this.statusView?.setFailed("Pending sentence is no longer available");
+      return;
+    }
+
+    if (sentence.audioState === "error") {
+      this.clearPendingPlaybackTarget();
+      this.statusView?.setFailed(`Sentence ${sentenceId + 1} failed synthesis`);
+      new Notice(`Sentence ${sentenceId + 1} failed synthesis`);
+      return;
+    }
+
+    if (sentence.audioState !== "ready") {
+      return;
+    }
+
+    this.clearPendingPlaybackTarget();
+    const started = await this.playFromSentence(sentenceId);
+    if (started) {
+      new Notice(`Restarted from sentence ${sentenceId + 1}`);
+      return;
+    }
+
+    this.statusView?.setFailed(`Could not start sentence ${sentenceId + 1}`);
+    new Notice(`Could not start playback for sentence ${sentenceId + 1}`);
+  }
+
   async togglePauseResume(): Promise<void> {
     const playbackState = this.playback.getState();
 
@@ -335,6 +416,11 @@ export default class KokoroTtsPlugin extends Plugin {
     this.playback.stop();
     this.isPaused = false;
     this.isSynthesizing = false;
+    this.clearPendingPlaybackTarget();
+  }
+
+  private clearPendingPlaybackTarget(): void {
+    this.pendingPlaybackSentenceId = null;
   }
 
   private getPreparedActiveNote(): { notePath: string; text: string } | null {

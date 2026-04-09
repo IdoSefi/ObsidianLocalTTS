@@ -82,6 +82,12 @@ export class StatusView {
     this.setProgress(0, 0);
   }
 
+  setWaitingForSentence(index: number): void {
+    this.setText(`Waiting for sentence ${index}`);
+    this.setPlayPauseSymbol("▶");
+    this.setProgress(0, 0);
+  }
+
   setPlaying(index: number, total: number): void {
     this.setText(`Playing sentence ${index}/${total}`);
     this.setPlayPauseSymbol("⏸");
