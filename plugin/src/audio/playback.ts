@@ -172,7 +172,6 @@ export class PlaybackController {
       return false;
     }
 
-    this.stopCurrentAudio(false);
     const audio = new Audio(source.src);
     this.audio = audio;
 

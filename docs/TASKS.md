@@ -37,3 +37,4 @@
 | T-029 | Auto-start playback during ongoing synthesis | DONE | agent | T-027,T-009 | Playback starts on first ready sentence and waits for not-yet-ready following sentences |
 
 | T-030 | Add temp-staging bridge for server outputDir restriction | DONE | agent | T-027 | Synthesize now writes to system temp staging and copies WAVs into vault cache per sentence |
+| T-031 | Fix Blob URL revocation race causing playback ERR_FILE_NOT_FOUND | DONE | agent | T-009 | Removed redundant audio cleanup call before creating new Audio so Blob URL remains valid for playback |
