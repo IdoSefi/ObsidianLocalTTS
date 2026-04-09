@@ -40,6 +40,11 @@ export function resolveRenderedClickToTextOffset(
   } else if (target.nodeType === Node.TEXT_NODE) {
     clickNode = target;
     clickOffset = 0;
+  } else {
+    // Reading view often does not place a caret on click.
+    // Fall back to the clicked element so we can approximate an offset.
+    clickNode = target;
+    clickOffset = 0;
   }
 
   if (!clickNode || !root.contains(clickNode)) {

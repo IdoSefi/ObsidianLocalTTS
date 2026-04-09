@@ -28,3 +28,4 @@
 | F-017 | Status bar play/stop controls | COMPLETE | Added play/pause and stop buttons directly beside the status slider for quick access | Buttons call existing playback commands from status bar |
 | F-018 | Readiness-aware click-to-jump | COMPLETE | Reading-view clicks now request playback from the clicked sentence immediately if ready, or wait and auto-start when that sentence finishes generating | Pending click target is plugin-owned, replaced by newer clicks, cleared by Stop, and canceled on synthesis failure |
 | F-019 | Click acknowledgement notice | COMPLETE | Reading-view word clicks now show immediate feedback notice with the target sentence number | Notice text: `start reading from sentence N` |
+| F-020 | Reading-view click fallback mapping | COMPLETE | Click-to-sentence mapping now falls back to element-based offset approximation when no caret position is available | Fixes no-op clicks in Reading view where caret APIs return null |

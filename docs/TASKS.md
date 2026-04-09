@@ -41,3 +41,4 @@
 | T-032 | Add status-bar play/stop buttons beside slider | DONE | agent | T-025 | Added status bar buttons wired to pause/resume/play and stop actions next to seek slider |
 | T-033 | Add readiness-aware click-to-jump pending playback target | DONE | agent | T-014,T-029 | Click restart now queues a pending sentence target during synthesis and auto-starts once that sentence reaches ready state |
 | T-034 | Restore visible click feedback notice for Reading-view jump | DONE | agent | T-014,T-033 | Clicking mapped sentence now immediately shows "start reading from sentence N" notice before jump/wait handling |
+| T-035 | Make Reading-view click mapping work without caret placement | DONE | agent | T-013,T-034 | Added non-caret fallback mapping path for element targets so word clicks resolve sentence offsets in Reading view |
