@@ -1,66 +1,189 @@
-import { Notice } from "obsidian";
 import { promises as fs } from "node:fs";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { basename, extname, join } from "node:path";
+import { App, FileSystemAdapter, normalizePath } from "obsidian";
+import type { CachedSentenceAudio, NoteSynthesisManifest } from "../types";
 
-const CACHE_ROOT = join(tmpdir(), "obsidian-kokoro-tts");
-const STALE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
+const ROOT_FOLDER = "audio_synthesis";
+const MANIFEST_FILE = "manifest.json";
+const SENTENCE_FILE_REGEX = /^sentence-(\d+)\.wav$/i;
+const STAGING_ROOT = join(tmpdir(), "obsidian-kokoro-tts-staging");
 
-export class TempAudioCache {
-  private sessionId: string | null = null;
+export interface PrepareNoteFolderResult {
+  noteFolderPath: string;
+  absoluteFolderPath: string;
+}
 
-  async startSession(): Promise<string> {
-    this.sessionId = `session-${Date.now()}`;
-    const sessionFolder = join(CACHE_ROOT, this.sessionId);
-    await fs.mkdir(sessionFolder, { recursive: true });
-    return this.sessionId;
+export interface ExistingSentenceAudioResult {
+  noteFolderPath: string;
+  files: CachedSentenceAudio[];
+  manifest: NoteSynthesisManifest | null;
+}
+
+export class VaultAudioCache {
+  constructor(private readonly app: App) {}
+
+  getNoteSynthesisFolder(notePath: string): string {
+    const safeFolderName = this.getSafeNoteFolderName(notePath);
+    return normalizePath(`${ROOT_FOLDER}/${safeFolderName}`);
   }
 
-  getSessionId(): string {
-    if (!this.sessionId) {
-      throw new Error("No active Kokoro TTS session");
+  async prepareNoteSynthesisFolder(
+    notePath: string,
+    replaceExisting: boolean,
+  ): Promise<PrepareNoteFolderResult> {
+    await this.ensureFolderExists(ROOT_FOLDER);
+
+    const noteFolderPath = this.getNoteSynthesisFolder(notePath);
+    if (replaceExisting && (await this.app.vault.adapter.exists(noteFolderPath))) {
+      await this.app.vault.adapter.rmdir(noteFolderPath, true);
     }
-    return this.sessionId;
+
+    await this.ensureFolderExists(noteFolderPath);
+    return {
+      noteFolderPath,
+      absoluteFolderPath: this.getAbsolutePathForVaultPath(noteFolderPath),
+    };
   }
 
-  getSessionFolder(): string {
-    return join(CACHE_ROOT, this.getSessionId());
+  async prepareTempSynthesisFolder(notePath: string, replaceExisting: boolean): Promise<string> {
+    const tempFolder = this.getTempSynthesisFolder(notePath);
+    if (replaceExisting) {
+      await fs.rm(tempFolder, { recursive: true, force: true });
+    }
+    await fs.mkdir(tempFolder, { recursive: true });
+    return tempFolder;
   }
 
-  async cleanupCurrentSession(): Promise<void> {
-    if (!this.sessionId) {
+  async clearTempSynthesisFolder(notePath: string): Promise<void> {
+    await fs.rm(this.getTempSynthesisFolder(notePath), { recursive: true, force: true });
+  }
+
+  getSentenceAudioVaultPath(notePath: string, sentenceId: number): string {
+    const noteFolder = this.getNoteSynthesisFolder(notePath);
+    const oneBased = sentenceId + 1;
+    return normalizePath(`${noteFolder}/sentence-${String(oneBased).padStart(4, "0")}.wav`);
+  }
+
+  getSentenceAudioAbsolutePath(notePath: string, sentenceId: number): string {
+    return this.getAbsolutePathForVaultPath(this.getSentenceAudioVaultPath(notePath, sentenceId));
+  }
+
+  getAbsolutePathForVaultPath(vaultPath: string): string {
+    return this.toAbsolutePath(vaultPath);
+  }
+
+  async listExistingSentenceAudio(notePath: string): Promise<ExistingSentenceAudioResult> {
+    const noteFolderPath = this.getNoteSynthesisFolder(notePath);
+    const exists = await this.app.vault.adapter.exists(noteFolderPath);
+    if (!exists) {
+      return {
+        noteFolderPath,
+        files: [],
+        manifest: null,
+      };
+    }
+
+    const listResult = await this.app.vault.adapter.list(noteFolderPath);
+    const files: CachedSentenceAudio[] = listResult.files
+      .map((vaultPath) => {
+        const filename = vaultPath.split("/").pop() ?? "";
+        const match = filename.match(SENTENCE_FILE_REGEX);
+        if (!match) {
+          return null;
+        }
+        const sentenceId = Number(match[1]) - 1;
+        if (!Number.isInteger(sentenceId) || sentenceId < 0) {
+          return null;
+        }
+        return {
+          sentenceId,
+          audioVaultPath: vaultPath,
+          audioPath: this.toAbsolutePath(vaultPath),
+        };
+      })
+      .filter((file): file is CachedSentenceAudio => file !== null)
+      .sort((a, b) => a.sentenceId - b.sentenceId);
+
+    const manifest = await this.readManifest(notePath);
+
+    return {
+      noteFolderPath,
+      files,
+      manifest,
+    };
+  }
+
+  async clearNoteSynthesis(notePath: string): Promise<void> {
+    const folder = this.getNoteSynthesisFolder(notePath);
+    if (!(await this.app.vault.adapter.exists(folder))) {
       return;
     }
-
-    const sessionFolder = this.getSessionFolder();
-    await fs.rm(sessionFolder, { recursive: true, force: true });
-    this.sessionId = null;
+    await this.app.vault.adapter.rmdir(folder, true);
   }
 
-  async cleanupStaleSessions(): Promise<void> {
-    await fs.mkdir(CACHE_ROOT, { recursive: true });
-    const entries = await fs.readdir(CACHE_ROOT, { withFileTypes: true });
-    const now = Date.now();
-    let deleted = 0;
+  async writeManifest(notePath: string, manifest: NoteSynthesisManifest): Promise<void> {
+    const manifestPath = normalizePath(`${this.getNoteSynthesisFolder(notePath)}/${MANIFEST_FILE}`);
+    await this.app.vault.adapter.write(manifestPath, JSON.stringify(manifest, null, 2));
+  }
 
-    for (const entry of entries) {
-      if (!entry.isDirectory() || !entry.name.startsWith("session-")) {
-        continue;
-      }
-
-      const folderPath = join(CACHE_ROOT, entry.name);
-      const stat = await fs.stat(folderPath);
-      const age = now - stat.mtimeMs;
-      if (age <= STALE_MAX_AGE_MS) {
-        continue;
-      }
-
-      await fs.rm(folderPath, { recursive: true, force: true });
-      deleted += 1;
+  async readManifest(notePath: string): Promise<NoteSynthesisManifest | null> {
+    const manifestPath = normalizePath(`${this.getNoteSynthesisFolder(notePath)}/${MANIFEST_FILE}`);
+    if (!(await this.app.vault.adapter.exists(manifestPath))) {
+      return null;
     }
 
-    if (deleted > 0) {
-      new Notice(`Cleaned ${deleted} stale Kokoro TTS cache session(s)`);
+    try {
+      const raw = await this.app.vault.adapter.read(manifestPath);
+      return JSON.parse(raw) as NoteSynthesisManifest;
+    } catch {
+      return null;
     }
   }
+
+  private getTempSynthesisFolder(notePath: string): string {
+    return join(STAGING_ROOT, this.getSafeNoteFolderName(notePath));
+  }
+
+  private async ensureFolderExists(folder: string): Promise<void> {
+    if (await this.app.vault.adapter.exists(folder)) {
+      return;
+    }
+    await this.app.vault.adapter.mkdir(folder);
+  }
+
+  private getSafeNoteFolderName(notePath: string): string {
+    const normalizedPath = normalizePath(notePath);
+    const filename = basename(normalizedPath, extname(normalizedPath)) || "note";
+    const sanitizedBase = sanitizeForWindows(filename).slice(0, 40) || "note";
+    const hash = hashString(normalizedPath);
+    return `${sanitizedBase}-${hash}`;
+  }
+
+  private toAbsolutePath(vaultPath: string): string {
+    const adapter = this.app.vault.adapter;
+    if (!(adapter instanceof FileSystemAdapter)) {
+      throw new Error("Persistent note synthesis requires FileSystemAdapter on desktop");
+    }
+
+    return join(adapter.getBasePath(), vaultPath);
+  }
+}
+
+function sanitizeForWindows(input: string): string {
+  const replaced = input
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
+    .replace(/[.\s]+$/g, "")
+    .trim();
+
+  return replaced || "note";
+}
+
+function hashString(input: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }

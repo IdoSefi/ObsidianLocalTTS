@@ -7,10 +7,10 @@ export function registerUiControls(plugin: KokoroTtsPlugin): void {
   });
   synthIcon.addClass("kokoro-tts-ribbon-synthesize");
 
-  const pauseIcon = plugin.addRibbonIcon("pause", "Pause or resume playback", async () => {
+  const playPauseIcon = plugin.addRibbonIcon("play", "Play cached note audio or pause/resume", async () => {
     await plugin.togglePauseResume();
   });
-  pauseIcon.addClass("kokoro-tts-ribbon-pause");
+  playPauseIcon.addClass("kokoro-tts-ribbon-play");
 
   const stopIcon = plugin.addRibbonIcon("square", "Stop playback", () => {
     plugin.stopPlayback();

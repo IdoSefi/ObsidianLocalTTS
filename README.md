@@ -2,14 +2,38 @@
 
 Personal-use Obsidian desktop plugin for local text-to-speech with sentence-level playback using Kokoro-82M.
 
-## v1 scope
+## v1.1 scope
 - Reading view only
 - Localhost Kokoro server
-- One temp WAV per sentence
+- One cached WAV per sentence
+- Persistent per-note cache under vault `audio_synthesis/`
 - Click a word to restart from that sentence
+- Distinct **Synthesize** vs **Play cached** flows
 - Pause/resume/stop
-- Visible synthesis + playback status UI (Notices + status bar + seek slider)
-- Temp files deleted on unload and cleaned on startup
+- Playback can start while synthesis is still ongoing
+- Visible synthesis + playback status UI (Notices + status bar + seek slider + play/stop buttons)
+
+## Synthesize vs Play behavior
+- **Synthesize active note**
+  - Always regenerates sentence audio for the active note.
+  - Replaces old audio files for that note.
+  - Starts playback as soon as the first sentence is ready (does not wait for all sentences).
+- **Play active note from cached synthesis**
+  - Reuses existing sentence WAV files from vault cache.
+  - Does not regenerate audio.
+  - If no cached synthesis exists, plugin shows a notice to synthesize first.
+
+## Vault cache layout
+For each note, synthesis is stored inside your vault:
+
+- `audio_synthesis/<note-folder>/manifest.json`
+- `audio_synthesis/<note-folder>/sentence-0001.wav`
+- `audio_synthesis/<note-folder>/sentence-0002.wav`
+- ...
+
+`<note-folder>` is a Windows-safe folder name derived from the note path plus a short hash so notes with the same filename in different folders do not collide.
+
+During synthesis, the plugin may use a system-temp staging folder for server compatibility, then copies each completed WAV into this vault cache location.
 
 ## Project docs
 - `AGENTS.md` — repo rules for coding agents
@@ -82,4 +106,4 @@ npm run build
 
 Then copy/symlink `plugin/` into your vault under `.obsidian/plugins/obsidian-kokoro-tts/`, enable the plugin in Obsidian, keep server URL set to `http://127.0.0.1:8765`, switch to Reading view, and run **Synthesize active note**.
 
-During synthesis/playback, watch the Obsidian status bar for `Kokoro TTS` state (Idle, Synthesizing X/Y, Playing/Paused sentence X/Y, Stopped/Failed). The slider shows current sentence progress and supports seeking within the active sentence.
+During synthesis/playback, watch the Obsidian status bar for `Kokoro TTS` state (Idle, Synthesizing X/Y, Playing/Paused sentence X/Y, Stopped/Failed). The slider shows current sentence progress and supports seeking within the active sentence, and the play/stop buttons appear next to the slider for quick controls.
