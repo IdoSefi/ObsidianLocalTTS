@@ -24,6 +24,27 @@ function findFirstTextDescendant(node: Node): Node | null {
   return next ?? null;
 }
 
+function resolveOffsetFromRange(root: HTMLElement, clickNode: Node, clickOffset: number): number | null {
+  try {
+    const range = document.createRange();
+    range.setStart(root, 0);
+
+    if (clickNode.nodeType === Node.TEXT_NODE) {
+      const textLength = clickNode.textContent?.length ?? 0;
+      const safeOffset = Math.min(Math.max(clickOffset, 0), textLength);
+      range.setEnd(clickNode, safeOffset);
+    } else {
+      const childCount = clickNode.childNodes.length;
+      const safeOffset = Math.min(Math.max(clickOffset, 0), childCount);
+      range.setEnd(clickNode, safeOffset);
+    }
+
+    return range.toString().length;
+  } catch {
+    return null;
+  }
+}
+
 export function resolveRenderedClickToTextOffset(
   root: HTMLElement,
   target: EventTarget | null,
@@ -68,6 +89,11 @@ export function resolveRenderedClickToTextOffset(
 
   if (!clickNode || !root.contains(clickNode)) {
     return { offset: null };
+  }
+
+  const rangeOffset = resolveOffsetFromRange(root, clickNode, clickOffset);
+  if (rangeOffset !== null) {
+    return { offset: rangeOffset };
   }
 
   let offset = 0;
