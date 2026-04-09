@@ -27,3 +27,4 @@
 | F-016 | Stable Blob URL playback lifecycle | COMPLETE | Prevents revoking newly created blob audio URL before `Audio` consumes it | Fixes intermittent/constant `ERR_FILE_NOT_FOUND` during sentence playback |
 | F-017 | Status bar play/stop controls | COMPLETE | Added play/pause and stop buttons directly beside the status slider for quick access | Buttons call existing playback commands from status bar |
 | F-018 | Readiness-aware click-to-jump | COMPLETE | Reading-view clicks now request playback from the clicked sentence immediately if ready, or wait and auto-start when that sentence finishes generating | Pending click target is plugin-owned, replaced by newer clicks, cleared by Stop, and canceled on synthesis failure |
+| F-019 | Click acknowledgement notice | COMPLETE | Reading-view word clicks now show immediate feedback notice with the target sentence number | Notice text: `start reading from sentence N` |
