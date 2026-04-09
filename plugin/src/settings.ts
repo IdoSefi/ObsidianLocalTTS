@@ -6,7 +6,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   serverUrl: "http://127.0.0.1:8765",
   voice: "af_heart",
   speed: 1.0,
-  clearStaleCacheOnStartup: true,
 };
 
 export class KokoroTtsSettingTab extends PluginSettingTab {
@@ -54,16 +53,6 @@ export class KokoroTtsSettingTab extends PluginSettingTab {
             this.plugin.settings.speed = parsed;
             await this.plugin.saveSettings();
           }
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName("Clear stale cache on startup")
-      .setDesc("Remove old temp audio folders from prior runs")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.clearStaleCacheOnStartup).onChange(async (value) => {
-          this.plugin.settings.clearStaleCacheOnStartup = value;
-          await this.plugin.saveSettings();
         }),
       );
   }

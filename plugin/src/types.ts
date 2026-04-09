@@ -10,11 +10,23 @@ export interface SentenceChunk {
   audioState: AudioState;
 }
 
+export interface CachedSentenceAudio {
+  sentenceId: number;
+  audioVaultPath: string;
+  audioPath: string;
+}
+
+export interface NoteSynthesisManifest {
+  notePath: string;
+  sentenceCount: number;
+  generatedAt: string;
+  sentenceTextHashes: string[];
+}
+
 export interface PluginSettings {
   serverUrl: string;
   voice: string;
   speed: number;
-  clearStaleCacheOnStartup: boolean;
 }
 
 export interface SynthesisRequest {

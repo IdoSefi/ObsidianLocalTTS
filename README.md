@@ -2,14 +2,36 @@
 
 Personal-use Obsidian desktop plugin for local text-to-speech with sentence-level playback using Kokoro-82M.
 
-## v1 scope
+## v1.1 scope
 - Reading view only
 - Localhost Kokoro server
-- One temp WAV per sentence
+- One cached WAV per sentence
+- Persistent per-note cache under vault `audio_synthesis/`
 - Click a word to restart from that sentence
+- Distinct **Synthesize** vs **Play cached** flows
 - Pause/resume/stop
+- Playback can start while synthesis is still ongoing
 - Visible synthesis + playback status UI (Notices + status bar + seek slider)
-- Temp files deleted on unload and cleaned on startup
+
+## Synthesize vs Play behavior
+- **Synthesize active note**
+  - Always regenerates sentence audio for the active note.
+  - Replaces old audio files for that note.
+  - Starts playback as soon as the first sentence is ready (does not wait for all sentences).
+- **Play active note from cached synthesis**
+  - Reuses existing sentence WAV files from vault cache.
+  - Does not regenerate audio.
+  - If no cached synthesis exists, plugin shows a notice to synthesize first.
+
+## Vault cache layout
+For each note, synthesis is stored inside your vault:
+
+- `audio_synthesis/<note-folder>/manifest.json`
+- `audio_synthesis/<note-folder>/sentence-0001.wav`
+- `audio_synthesis/<note-folder>/sentence-0002.wav`
+- ...
+
+`<note-folder>` is a Windows-safe folder name derived from the note path plus a short hash so notes with the same filename in different folders do not collide.
 
 ## Project docs
 - `AGENTS.md` — repo rules for coding agents
