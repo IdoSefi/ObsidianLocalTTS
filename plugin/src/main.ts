@@ -322,11 +322,9 @@ export default class KokoroTtsPlugin extends Plugin {
       return;
     }
 
-    if (this.sentencesNotePath !== prepared.notePath || this.sentences.length === 0) {
-      const firstReadyIndex = await this.loadSentencesFromCache(prepared.notePath, prepared.text, split);
-      if (firstReadyIndex < 0) {
-        return;
-      }
+    const firstReadyIndex = await this.loadSentencesFromCache(prepared.notePath, prepared.text, split);
+    if (firstReadyIndex < 0) {
+      return;
     }
 
     const started = await this.playFromSentence(sentence.id, true);
@@ -402,14 +400,23 @@ export default class KokoroTtsPlugin extends Plugin {
       return -1;
     }
 
-    const cached = await this.cache.listExistingSentenceAudio(notePath);
+    let cached = await this.cache.listExistingSentenceAudio(notePath);
     if (cached.files.length === 0) {
       new Notice("No cached synthesis found. Run 'Synthesize active note' first.");
       return -1;
     }
 
+    let validation = validateCacheAgainstCurrentSentences(currentNoteText, split, cached.manifest);
+
+    if (!validation.isFullyValid) {
+      const staleDisplayIndex = (validation.firstStaleSentenceIndex ?? 0) + 1;
+      new Notice(`The note changed from sentence ${staleDisplayIndex} onward. Re-synthesizing outdated audio...`);
+      await this.resynthesizeInvalidSentences(notePath, currentNoteText, split, validation.firstStaleSentenceIndex ?? 0);
+      cached = await this.cache.listExistingSentenceAudio(notePath);
+      validation = validateCacheAgainstCurrentSentences(currentNoteText, split, cached.manifest);
+    }
+
     const filesBySentence = new Map(cached.files.map((item) => [item.sentenceId, item.audioPath]));
-    const validation = validateCacheAgainstCurrentSentences(currentNoteText, split, cached.manifest);
     const validPrefixCount = validation.validSentenceCount;
 
     this.sentences = split.map((sentence) => {
@@ -431,13 +438,6 @@ export default class KokoroTtsPlugin extends Plugin {
     this.sentencesNotePath = notePath;
     this.playback.setSentences(this.sentences);
 
-    if (!cached.manifest) {
-      new Notice("Cached synthesis is missing its manifest. Re-synthesize for accurate playback.");
-    } else if (!validation.isFullyValid) {
-      const staleDisplayIndex = (validation.firstStaleSentenceIndex ?? 0) + 1;
-      new Notice(`The note changed from sentence ${staleDisplayIndex} onward. Re-synthesize to continue accurately.`);
-    }
-
     const firstReadyIndex = this.sentences.findIndex((sentence) => sentence.audioState === "ready");
     if (firstReadyIndex < 0) {
       if (!validation.isFullyValid || !cached.manifest) {
@@ -448,12 +448,69 @@ export default class KokoroTtsPlugin extends Plugin {
       return -1;
     }
 
-    if (cached.manifest && !validation.isFullyValid) {
+    if (!validation.isFullyValid) {
       const validCount = validation.validSentenceCount;
-      new Notice(`Playing only the first ${validCount} unchanged sentence${validCount === 1 ? "" : "s"} from cache.`);
+      new Notice(
+        `The note changed and some sentences could not be regenerated. Playing only the first ${validCount} unchanged sentence${validCount === 1 ? "" : "s"}.`,
+      );
     }
 
     return firstReadyIndex;
+  }
+
+  private async resynthesizeInvalidSentences(
+    notePath: string,
+    currentNoteText: string,
+    split: SentenceChunk[],
+    staleFromIndex: number,
+  ): Promise<void> {
+    if (!this.client) {
+      new Notice("Kokoro client is not initialized");
+      return;
+    }
+
+    await this.cache.prepareNoteSynthesisFolder(notePath, false);
+    const tempOutputDir = await this.cache.prepareTempSynthesisFolder(notePath, true);
+    const sessionId = `note-resynth-${Date.now()}`;
+    let regeneratedCount = 0;
+    let failedCount = 0;
+
+    try {
+      for (let idx = staleFromIndex; idx < split.length; idx += 1) {
+        const sentence = split[idx];
+        const { response: result } = await this.client.synthesizeSentence({
+          sessionId,
+          sentenceId: sentence.id,
+          text: sentence.text,
+          voice: this.settings.voice,
+          speed: this.settings.speed,
+          outputDir: tempOutputDir,
+        });
+
+        if (!result.ok || !result.audioPath) {
+          failedCount += 1;
+          const reason = result.error ?? "unknown error";
+          console.error(`[KokoroTTS] Re-synthesis failed for sentence ${sentence.id + 1}: ${reason}`);
+          continue;
+        }
+
+        const persistentAudioPath = this.cache.getSentenceAudioAbsolutePath(notePath, sentence.id);
+        await fs.mkdir(dirname(persistentAudioPath), { recursive: true });
+        await fs.copyFile(result.audioPath, persistentAudioPath);
+        regeneratedCount += 1;
+      }
+    } finally {
+      await this.cache.clearTempSynthesisFolder(notePath);
+    }
+
+    await this.cache.writeManifest(notePath, this.buildManifest(notePath, currentNoteText, split));
+
+    if (failedCount > 0) {
+      new Notice(`Re-synthesized ${regeneratedCount} sentences, but ${failedCount} failed.`);
+      return;
+    }
+
+    new Notice(`Re-synthesized ${regeneratedCount} updated sentence${regeneratedCount === 1 ? "" : "s"}.`);
   }
 }
 
