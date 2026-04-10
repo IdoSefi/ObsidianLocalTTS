@@ -17,6 +17,26 @@
   justify-content: center;
 }
 
+.kokoro-tts-status-speed-button {
+  min-width: 46px;
+  height: 24px;
+  padding: 0 6px;
+  line-height: 1;
+}
+
+.kokoro-tts-status-speed-panel {
+  display: none;
+  align-items: center;
+}
+
+.kokoro-tts-status-speed-panel.is-open {
+  display: inline-flex;
+}
+
+.kokoro-tts-status-speed-slider {
+  width: 90px;
+}
+
 .kokoro-tts-playing-sentence {
   outline: 1px solid var(--interactive-accent);
   border-radius: 4px;

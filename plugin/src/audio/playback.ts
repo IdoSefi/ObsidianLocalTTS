@@ -32,6 +32,7 @@ export class PlaybackController {
     null;
   private playbackRunId = 0;
   private state: PlaybackState = "idle";
+  private playbackRate = 1;
 
   setSentences(sentences: SentenceChunk[]): void {
     this.sentences = sentences;
@@ -55,6 +56,18 @@ export class PlaybackController {
 
   getState(): PlaybackState {
     return this.state;
+  }
+
+  setPlaybackRate(rate: number): void {
+    const clampedRate = Math.min(Math.max(rate, 0.75), 1.5);
+    this.playbackRate = Math.round(clampedRate * 100) / 100;
+    if (this.audio) {
+      this.audio.playbackRate = this.playbackRate;
+    }
+  }
+
+  getPlaybackRate(): number {
+    return this.playbackRate;
   }
 
   async playFromSentence(index: number, allowWaitingForPendingSentence = false): Promise<boolean> {
@@ -173,6 +186,7 @@ export class PlaybackController {
     }
 
     const audio = new Audio(source.src);
+    audio.playbackRate = this.playbackRate;
     this.audio = audio;
 
     audio.addEventListener("loadedmetadata", () => {
