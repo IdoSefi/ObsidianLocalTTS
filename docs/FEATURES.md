@@ -27,3 +27,4 @@
 | F-016 | Stable Blob URL playback lifecycle | COMPLETE | Prevents revoking newly created blob audio URL before `Audio` consumes it | Fixes intermittent/constant `ERR_FILE_NOT_FOUND` during sentence playback |
 | F-017 | Status bar play/stop controls | COMPLETE | Added play/pause and stop buttons directly beside the status slider for quick access | Buttons call existing playback commands from status bar |
 | F-018 | Source mode editor-model offsets | COMPLETE | In Source mode, sentence lookup uses editor text + cursor absolute offset from `posToOffset` | Avoids DOM/caret APIs for edit-mode mapping |
+| F-019 | Source-mode cross-note restart correctness | COMPLETE | Right-click restart in Source mode uses the currently active note cache/sentences after note switches | Prevents continuing playback from a previously active note |
