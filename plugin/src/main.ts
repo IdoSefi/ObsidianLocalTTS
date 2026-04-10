@@ -15,6 +15,7 @@ interface CacheValidationResult {
   isFullyValid: boolean;
   firstStaleSentenceIndex: number | null;
   validSentenceCount: number;
+  noteHashOnlyMismatch: boolean;
 }
 
 export default class KokoroTtsPlugin extends Plugin {
@@ -408,12 +409,14 @@ export default class KokoroTtsPlugin extends Plugin {
 
     let validation = validateCacheAgainstCurrentSentences(currentNoteText, split, cached.manifest);
 
-    if (!validation.isFullyValid) {
+    if (shouldResynthesizeFromValidation(validation, split.length)) {
       const staleDisplayIndex = (validation.firstStaleSentenceIndex ?? 0) + 1;
       new Notice(`The note changed from sentence ${staleDisplayIndex} onward. Re-synthesizing outdated audio...`);
       await this.resynthesizeInvalidSentences(notePath, currentNoteText, split, validation.firstStaleSentenceIndex ?? 0);
       cached = await this.cache.listExistingSentenceAudio(notePath);
       validation = validateCacheAgainstCurrentSentences(currentNoteText, split, cached.manifest);
+    } else if (validation.noteHashOnlyMismatch) {
+      console.info("[KokoroTTS] Note-level hash changed but sentence hashes still match; skipping re-synthesis.");
     }
 
     const filesBySentence = new Map(cached.files.map((item) => [item.sentenceId, item.audioPath]));
@@ -448,7 +451,7 @@ export default class KokoroTtsPlugin extends Plugin {
       return -1;
     }
 
-    if (!validation.isFullyValid) {
+    if (!validation.isFullyValid && !validation.noteHashOnlyMismatch) {
       const validCount = validation.validSentenceCount;
       new Notice(
         `The note changed and some sentences could not be regenerated. Playing only the first ${validCount} unchanged sentence${validCount === 1 ? "" : "s"}.`,
@@ -524,6 +527,7 @@ function validateCacheAgainstCurrentSentences(
       isFullyValid: false,
       firstStaleSentenceIndex: 0,
       validSentenceCount: 0,
+      noteHashOnlyMismatch: false,
     };
   }
 
@@ -554,14 +558,28 @@ function validateCacheAgainstCurrentSentences(
       isFullyValid: true,
       firstStaleSentenceIndex: null,
       validSentenceCount: currentSentenceHashes.length,
+      noteHashOnlyMismatch: false,
     };
   }
+
+  const noteHashOnlyMismatch =
+    firstMismatchIndex === null &&
+    manifest.sentenceCount === currentSentenceHashes.length &&
+    manifest.noteTextHash !== currentNoteTextHash;
 
   return {
     isFullyValid: false,
     firstStaleSentenceIndex: firstMismatchIndex ?? 0,
     validSentenceCount: firstMismatchIndex ?? 0,
+    noteHashOnlyMismatch,
   };
+}
+
+function shouldResynthesizeFromValidation(validation: CacheValidationResult, sentenceCount: number): boolean {
+  if (validation.firstStaleSentenceIndex !== null) {
+    return true;
+  }
+  return validation.validSentenceCount < sentenceCount;
 }
 
 function hashSentenceText(text: string): string {
