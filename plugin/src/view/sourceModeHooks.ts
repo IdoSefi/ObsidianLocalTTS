@@ -2,21 +2,20 @@ import { MarkdownView } from "obsidian";
 import type KokoroTtsPlugin from "../main";
 
 export function registerSourceModeHooks(plugin: KokoroTtsPlugin): void {
-  let restartTimeout: number | null = null;
+  plugin.registerEvent(
+    plugin.app.workspace.on("editor-menu", (menu, _editor, info) => {
+      if (!(info instanceof MarkdownView) || info.getMode() !== "source") {
+        return;
+      }
 
-  plugin.registerDomEvent(document, "click", () => {
-    const activeView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!activeView || activeView.getMode() !== "source") {
-      return;
-    }
-
-    if (restartTimeout !== null) {
-      window.clearTimeout(restartTimeout);
-    }
-
-    restartTimeout = window.setTimeout(() => {
-      restartTimeout = null;
-      void plugin.restartPlaybackFromSourceCursor();
-    }, 0);
-  });
+      menu.addItem((item) => {
+        item
+          .setTitle("Start reading from here")
+          .setIcon("play")
+          .onClick(() => {
+            void plugin.restartPlaybackFromSourceCursor();
+          });
+      });
+    }),
+  );
 }

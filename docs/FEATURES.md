@@ -20,7 +20,7 @@
 | F-010 | Wait-for-ready playback progression | COMPLETE | If next sentence is not ready yet, playback waits/polls briefly | Simple 250ms polling while synthesis is active |
 | F-011 | Partial-failure resilience | COMPLETE | Keep/play already-ready sentence audio even when some synthesis requests fail | End-of-run notice summarizes ready vs failed counts |
 | F-012 | Settings tab | PARTIAL | Configure localhost server URL, voice, and speed | Needs further validation polish |
-| F-013 | Live Preview support | PARTIAL | Click handling in editor mode | Source-mode cursor-based restart uses editor APIs; no DOM click mapping |
+| F-013 | Live Preview support | PARTIAL | Editor-mode restart action | Source mode uses right-click menu action `Start reading from here` and editor cursor offsets; no DOM click mapping |
 | F-014 | Word-level timestamps | DEFERRED | Exact word alignment | Not needed for v1/v1.1 |
 
 | F-015 | Temp staging bridge for synthesis writes | COMPLETE | Server writes sentence WAVs into system-temp staging, then plugin copies each WAV into vault `audio_synthesis/` cache | Keeps persistent vault cache while honoring server outputDir safety constraint |
