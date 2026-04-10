@@ -64,12 +64,7 @@ export function registerReadingViewHooks(plugin: KokoroTtsPlugin): void {
 }
 
 function readRenderedText(root: HTMLElement): string {
-  let text = "";
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  while (walker.nextNode()) {
-    text += walker.currentNode.textContent ?? "";
-  }
-  return text;
+  return root.innerText ?? root.textContent ?? "";
 }
 
 function resolvePluginSentence(
@@ -77,9 +72,26 @@ function resolvePluginSentence(
   renderedSentence: SentenceChunk,
 ): SentenceChunk | undefined {
   const byIndex = pluginSentences[renderedSentence.id];
-  if (byIndex) {
+  if (byIndex && normalizeSentenceText(byIndex.text) === normalizeSentenceText(renderedSentence.text)) {
     return byIndex;
   }
 
-  return pluginSentences.find((sentence) => sentence.text === renderedSentence.text);
+  const normalizedRenderedText = normalizeSentenceText(renderedSentence.text);
+  const matchingSentences = pluginSentences.filter(
+    (sentence) => normalizeSentenceText(sentence.text) === normalizedRenderedText,
+  );
+  if (matchingSentences.length === 1) {
+    return matchingSentences[0];
+  }
+  if (matchingSentences.length > 1) {
+    return matchingSentences.reduce((closest, current) =>
+      Math.abs(current.id - renderedSentence.id) < Math.abs(closest.id - renderedSentence.id) ? current : closest,
+    );
+  }
+
+  return byIndex;
+}
+
+function normalizeSentenceText(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
 }

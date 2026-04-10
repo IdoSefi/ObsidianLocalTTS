@@ -46,3 +46,4 @@
 | T-037 | Resolve "no sentence for offset" by nearest-sentence fallback | DONE | agent | T-036 | Click hook now falls back to nearest sentence when mapped offset lands outside trimmed sentence ranges |
 | T-038 | Align click offset calculation with rendered range text | DONE | agent | T-037 | Switched primary offset calculation to DOM Range length from root start to click point, reducing systematic offset drift to last sentence |
 | T-039 | Resolve 2D/newline drift by mapping offset against rendered-text sentence split | DONE | agent | T-038 | Click mapping now splits rendered DOM text and maps click to that sentence set before resolving plugin sentence |
+| T-040 | Simplify click sentence resolution and remove brittle mapping assumptions | DONE | agent | T-039 | Reading click resolution now uses `innerText` as single rendered-text source and sentence-text normalization before index fallback |
