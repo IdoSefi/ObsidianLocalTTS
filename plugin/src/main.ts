@@ -11,6 +11,13 @@ import { registerUiControls } from "./ui/controls";
 import { StatusView } from "./ui/status";
 import { registerSourceModeHooks } from "./view/sourceModeHooks";
 
+interface CacheValidationResult {
+  isFullyValid: boolean;
+  firstStaleSentenceIndex: number | null;
+  validSentenceCount: number;
+  noteHashOnlyMismatch: boolean;
+}
+
 export default class KokoroTtsPlugin extends Plugin {
   settings: PluginSettings = DEFAULT_SETTINGS;
   private readonly playback = new PlaybackController();
@@ -154,7 +161,7 @@ export default class KokoroTtsPlugin extends Plugin {
     const tempOutputDir = await this.cache.prepareTempSynthesisFolder(notePath, true);
     const sessionId = `note-${Date.now()}`;
 
-    await this.cache.writeManifest(notePath, this.buildManifest(notePath, this.sentences));
+    await this.cache.writeManifest(notePath, this.buildManifest(notePath, prepared.text, this.sentences));
 
     new Notice(`Starting synthesis for ${total} sentences`);
     this.statusView?.setSynthesizing(0, total);
@@ -216,7 +223,7 @@ export default class KokoroTtsPlugin extends Plugin {
     } finally {
       this.isSynthesizing = false;
       await this.cache.clearTempSynthesisFolder(notePath);
-      await this.cache.writeManifest(notePath, this.buildManifest(notePath, this.sentences));
+      await this.cache.writeManifest(notePath, this.buildManifest(notePath, prepared.text, this.sentences));
     }
 
     new Notice(`Synthesis complete: ${readyCount} ready, ${failedCount} failed`);
@@ -242,7 +249,7 @@ export default class KokoroTtsPlugin extends Plugin {
 
     const notePath = prepared.notePath;
     const split = splitIntoSentences(prepared.text);
-    const firstReadyIndex = await this.loadSentencesFromCache(notePath, split);
+    const firstReadyIndex = await this.loadSentencesFromCache(notePath, prepared.text, split);
     if (firstReadyIndex < 0) {
       return;
     }
@@ -316,11 +323,9 @@ export default class KokoroTtsPlugin extends Plugin {
       return;
     }
 
-    if (this.sentencesNotePath !== prepared.notePath || this.sentences.length === 0) {
-      const firstReadyIndex = await this.loadSentencesFromCache(prepared.notePath, split);
-      if (firstReadyIndex < 0) {
-        return;
-      }
+    const firstReadyIndex = await this.loadSentencesFromCache(prepared.notePath, prepared.text, split);
+    if (firstReadyIndex < 0) {
+      return;
     }
 
     const started = await this.playFromSentence(sentence.id, true);
@@ -376,31 +381,52 @@ export default class KokoroTtsPlugin extends Plugin {
     return { notePath, text, mode: "preview", offset: 0 };
   }
 
-  private buildManifest(notePath: string, sentences: SentenceChunk[]): NoteSynthesisManifest {
+  private buildManifest(notePath: string, noteText: string, sentences: SentenceChunk[]): NoteSynthesisManifest {
     return {
       notePath,
       sentenceCount: sentences.length,
       generatedAt: new Date().toISOString(),
+      noteTextHash: hashNoteText(noteText),
       sentenceTextHashes: sentences.map((sentence) => hashSentenceText(sentence.text)),
     };
   }
 
-  private async loadSentencesFromCache(notePath: string, split: SentenceChunk[]): Promise<number> {
+  private async loadSentencesFromCache(
+    notePath: string,
+    currentNoteText: string,
+    split: SentenceChunk[],
+  ): Promise<number> {
     if (split.length === 0) {
       new Notice("No readable sentences found in the active note");
       return -1;
     }
 
-    const cached = await this.cache.listExistingSentenceAudio(notePath);
+    let cached = await this.cache.listExistingSentenceAudio(notePath);
     if (cached.files.length === 0) {
       new Notice("No cached synthesis found. Run 'Synthesize active note' first.");
       return -1;
     }
 
+    let validation = validateCacheAgainstCurrentSentences(currentNoteText, split, cached.manifest);
+
+    if (shouldResynthesizeFromValidation(validation, split.length)) {
+      const staleDisplayIndex = (validation.firstStaleSentenceIndex ?? 0) + 1;
+      new Notice(`The note changed from sentence ${staleDisplayIndex} onward. Re-synthesizing outdated audio...`);
+      await this.resynthesizeInvalidSentences(notePath, currentNoteText, split, validation.firstStaleSentenceIndex ?? 0);
+      cached = await this.cache.listExistingSentenceAudio(notePath);
+      validation = validateCacheAgainstCurrentSentences(currentNoteText, split, cached.manifest);
+    } else if (validation.noteHashOnlyMismatch) {
+      console.info("[KokoroTTS] Note-level hash changed but sentence hashes still match; skipping re-synthesis.");
+    }
+
     const filesBySentence = new Map(cached.files.map((item) => [item.sentenceId, item.audioPath]));
+    const validPrefixCount = validation.validSentenceCount;
+
     this.sentences = split.map((sentence) => {
       const audioPath = filesBySentence.get(sentence.id);
-      if (!audioPath) {
+      const isSentenceWithinValidPrefix = sentence.id < validPrefixCount;
+      const isPlayable = isSentenceWithinValidPrefix && Boolean(audioPath);
+      if (!isPlayable) {
         return {
           ...sentence,
           audioState: "error" as const,
@@ -417,21 +443,150 @@ export default class KokoroTtsPlugin extends Plugin {
 
     const firstReadyIndex = this.sentences.findIndex((sentence) => sentence.audioState === "ready");
     if (firstReadyIndex < 0) {
-      new Notice("Cached synthesis exists but no playable sentence files were found");
+      if (!validation.isFullyValid || !cached.manifest) {
+        new Notice("Cached synthesis is outdated for this note.");
+      } else {
+        new Notice("Cached synthesis exists but no playable sentence files were found");
+      }
       return -1;
     }
 
-    if (cached.manifest && cached.manifest.sentenceCount !== split.length) {
+    if (!validation.isFullyValid && !validation.noteHashOnlyMismatch) {
+      const validCount = validation.validSentenceCount;
       new Notice(
-        `Cached synthesis sentence count (${cached.manifest.sentenceCount}) differs from current note (${split.length}). Playing available audio only.`,
+        `The note changed and some sentences could not be regenerated. Playing only the first ${validCount} unchanged sentence${validCount === 1 ? "" : "s"}.`,
       );
     }
 
     return firstReadyIndex;
   }
+
+  private async resynthesizeInvalidSentences(
+    notePath: string,
+    currentNoteText: string,
+    split: SentenceChunk[],
+    staleFromIndex: number,
+  ): Promise<void> {
+    if (!this.client) {
+      new Notice("Kokoro client is not initialized");
+      return;
+    }
+
+    await this.cache.prepareNoteSynthesisFolder(notePath, false);
+    const tempOutputDir = await this.cache.prepareTempSynthesisFolder(notePath, true);
+    const sessionId = `note-resynth-${Date.now()}`;
+    let regeneratedCount = 0;
+    let failedCount = 0;
+
+    try {
+      for (let idx = staleFromIndex; idx < split.length; idx += 1) {
+        const sentence = split[idx];
+        const { response: result } = await this.client.synthesizeSentence({
+          sessionId,
+          sentenceId: sentence.id,
+          text: sentence.text,
+          voice: this.settings.voice,
+          speed: this.settings.speed,
+          outputDir: tempOutputDir,
+        });
+
+        if (!result.ok || !result.audioPath) {
+          failedCount += 1;
+          const reason = result.error ?? "unknown error";
+          console.error(`[KokoroTTS] Re-synthesis failed for sentence ${sentence.id + 1}: ${reason}`);
+          continue;
+        }
+
+        const persistentAudioPath = this.cache.getSentenceAudioAbsolutePath(notePath, sentence.id);
+        await fs.mkdir(dirname(persistentAudioPath), { recursive: true });
+        await fs.copyFile(result.audioPath, persistentAudioPath);
+        regeneratedCount += 1;
+      }
+    } finally {
+      await this.cache.clearTempSynthesisFolder(notePath);
+    }
+
+    await this.cache.writeManifest(notePath, this.buildManifest(notePath, currentNoteText, split));
+
+    if (failedCount > 0) {
+      new Notice(`Re-synthesized ${regeneratedCount} sentences, but ${failedCount} failed.`);
+      return;
+    }
+
+    new Notice(`Re-synthesized ${regeneratedCount} updated sentence${regeneratedCount === 1 ? "" : "s"}.`);
+  }
+}
+
+function validateCacheAgainstCurrentSentences(
+  currentNoteText: string,
+  currentSentences: SentenceChunk[],
+  manifest: NoteSynthesisManifest | null,
+): CacheValidationResult {
+  if (!manifest) {
+    return {
+      isFullyValid: false,
+      firstStaleSentenceIndex: 0,
+      validSentenceCount: 0,
+      noteHashOnlyMismatch: false,
+    };
+  }
+
+  const currentSentenceHashes = currentSentences.map((sentence) => hashSentenceText(sentence.text));
+  const currentNoteTextHash = hashNoteText(currentNoteText);
+  const cachedSentenceHashes = manifest.sentenceTextHashes ?? [];
+  const maxComparableCount = Math.min(currentSentenceHashes.length, cachedSentenceHashes.length);
+
+  let firstMismatchIndex: number | null = null;
+  for (let index = 0; index < maxComparableCount; index += 1) {
+    if (currentSentenceHashes[index] !== cachedSentenceHashes[index]) {
+      firstMismatchIndex = index;
+      break;
+    }
+  }
+
+  if (firstMismatchIndex === null && currentSentenceHashes.length !== cachedSentenceHashes.length) {
+    firstMismatchIndex = maxComparableCount;
+  }
+
+  const isFullyValid =
+    firstMismatchIndex === null &&
+    manifest.sentenceCount === currentSentenceHashes.length &&
+    manifest.noteTextHash === currentNoteTextHash;
+
+  if (isFullyValid) {
+    return {
+      isFullyValid: true,
+      firstStaleSentenceIndex: null,
+      validSentenceCount: currentSentenceHashes.length,
+      noteHashOnlyMismatch: false,
+    };
+  }
+
+  const noteHashOnlyMismatch =
+    firstMismatchIndex === null &&
+    manifest.sentenceCount === currentSentenceHashes.length &&
+    manifest.noteTextHash !== currentNoteTextHash;
+
+  return {
+    isFullyValid: false,
+    firstStaleSentenceIndex: firstMismatchIndex ?? 0,
+    validSentenceCount: firstMismatchIndex ?? 0,
+    noteHashOnlyMismatch,
+  };
+}
+
+function shouldResynthesizeFromValidation(validation: CacheValidationResult, sentenceCount: number): boolean {
+  if (validation.firstStaleSentenceIndex !== null) {
+    return true;
+  }
+  return validation.validSentenceCount < sentenceCount;
 }
 
 function hashSentenceText(text: string): string {
+  return hashString(text);
+}
+
+function hashNoteText(text: string): string {
   return hashString(text);
 }
 

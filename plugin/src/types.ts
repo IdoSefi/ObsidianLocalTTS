@@ -20,7 +20,9 @@ export interface NoteSynthesisManifest {
   notePath: string;
   sentenceCount: number;
   generatedAt: string;
+  noteTextHash: string;
   sentenceTextHashes: string[];
+  sentenceTexts?: string[];
 }
 
 export interface PluginSettings {

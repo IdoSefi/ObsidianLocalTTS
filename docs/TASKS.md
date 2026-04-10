@@ -43,3 +43,6 @@
 | T-034 | Add Source mode context-menu restart action | DONE | agent | T-033 | Source mode restart now runs from editor right-click menu item `Start reading from here` |
 | T-035 | Disable Reading mode sentence-restart hooks and remove mapping code | DONE | agent | T-034 | Removed Reading view click hook + rendered DOM mapping module to keep restart action Source-mode-only |
 | T-036 | Fix Source-mode context-menu using wrong note after note switch | DONE | agent | T-034,T-035 | Track sentence note path and reload cache sentences for the currently active note before restart |
+| T-037 | Add hash-based cache invalidation with valid-prefix playback | DONE | agent | T-027,T-028 | Manifest now stores note text hash + sentence hashes; cached playback stops at first stale sentence and shows re-synthesize notices |
+| T-038 | Re-synthesize stale cache tail on replay/restart | DONE | agent | T-037 | Play and Source-mode "Start reading from here" now both validate current text and regenerate stale sentences from first mismatch onward |
+| T-039 | Avoid full re-synthesis on note-hash-only mismatch | DONE | agent | T-038 | Cache re-synthesis now runs only when sentence hashes diverge (or sentence counts differ), preventing unnecessary whole-note regeneration |
