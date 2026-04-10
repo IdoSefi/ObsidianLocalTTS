@@ -38,6 +38,7 @@
 }
 
 .kokoro-tts-playing-sentence {
+  background-color: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
   outline: 1px solid var(--interactive-accent);
   border-radius: 4px;
 }
