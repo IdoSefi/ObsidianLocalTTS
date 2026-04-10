@@ -11,6 +11,12 @@ import { registerUiControls } from "./ui/controls";
 import { StatusView } from "./ui/status";
 import { registerSourceModeHooks } from "./view/sourceModeHooks";
 
+interface CacheValidationResult {
+  isFullyValid: boolean;
+  firstStaleSentenceIndex: number | null;
+  validSentenceCount: number;
+}
+
 export default class KokoroTtsPlugin extends Plugin {
   settings: PluginSettings = DEFAULT_SETTINGS;
   private readonly playback = new PlaybackController();
@@ -154,7 +160,7 @@ export default class KokoroTtsPlugin extends Plugin {
     const tempOutputDir = await this.cache.prepareTempSynthesisFolder(notePath, true);
     const sessionId = `note-${Date.now()}`;
 
-    await this.cache.writeManifest(notePath, this.buildManifest(notePath, this.sentences));
+    await this.cache.writeManifest(notePath, this.buildManifest(notePath, prepared.text, this.sentences));
 
     new Notice(`Starting synthesis for ${total} sentences`);
     this.statusView?.setSynthesizing(0, total);
@@ -216,7 +222,7 @@ export default class KokoroTtsPlugin extends Plugin {
     } finally {
       this.isSynthesizing = false;
       await this.cache.clearTempSynthesisFolder(notePath);
-      await this.cache.writeManifest(notePath, this.buildManifest(notePath, this.sentences));
+      await this.cache.writeManifest(notePath, this.buildManifest(notePath, prepared.text, this.sentences));
     }
 
     new Notice(`Synthesis complete: ${readyCount} ready, ${failedCount} failed`);
@@ -242,7 +248,7 @@ export default class KokoroTtsPlugin extends Plugin {
 
     const notePath = prepared.notePath;
     const split = splitIntoSentences(prepared.text);
-    const firstReadyIndex = await this.loadSentencesFromCache(notePath, split);
+    const firstReadyIndex = await this.loadSentencesFromCache(notePath, prepared.text, split);
     if (firstReadyIndex < 0) {
       return;
     }
@@ -317,7 +323,7 @@ export default class KokoroTtsPlugin extends Plugin {
     }
 
     if (this.sentencesNotePath !== prepared.notePath || this.sentences.length === 0) {
-      const firstReadyIndex = await this.loadSentencesFromCache(prepared.notePath, split);
+      const firstReadyIndex = await this.loadSentencesFromCache(prepared.notePath, prepared.text, split);
       if (firstReadyIndex < 0) {
         return;
       }
@@ -376,16 +382,21 @@ export default class KokoroTtsPlugin extends Plugin {
     return { notePath, text, mode: "preview", offset: 0 };
   }
 
-  private buildManifest(notePath: string, sentences: SentenceChunk[]): NoteSynthesisManifest {
+  private buildManifest(notePath: string, noteText: string, sentences: SentenceChunk[]): NoteSynthesisManifest {
     return {
       notePath,
       sentenceCount: sentences.length,
       generatedAt: new Date().toISOString(),
+      noteTextHash: hashNoteText(noteText),
       sentenceTextHashes: sentences.map((sentence) => hashSentenceText(sentence.text)),
     };
   }
 
-  private async loadSentencesFromCache(notePath: string, split: SentenceChunk[]): Promise<number> {
+  private async loadSentencesFromCache(
+    notePath: string,
+    currentNoteText: string,
+    split: SentenceChunk[],
+  ): Promise<number> {
     if (split.length === 0) {
       new Notice("No readable sentences found in the active note");
       return -1;
@@ -398,9 +409,14 @@ export default class KokoroTtsPlugin extends Plugin {
     }
 
     const filesBySentence = new Map(cached.files.map((item) => [item.sentenceId, item.audioPath]));
+    const validation = validateCacheAgainstCurrentSentences(currentNoteText, split, cached.manifest);
+    const validPrefixCount = validation.validSentenceCount;
+
     this.sentences = split.map((sentence) => {
       const audioPath = filesBySentence.get(sentence.id);
-      if (!audioPath) {
+      const isSentenceWithinValidPrefix = sentence.id < validPrefixCount;
+      const isPlayable = isSentenceWithinValidPrefix && Boolean(audioPath);
+      if (!isPlayable) {
         return {
           ...sentence,
           audioState: "error" as const,
@@ -415,23 +431,87 @@ export default class KokoroTtsPlugin extends Plugin {
     this.sentencesNotePath = notePath;
     this.playback.setSentences(this.sentences);
 
+    if (!cached.manifest) {
+      new Notice("Cached synthesis is missing its manifest. Re-synthesize for accurate playback.");
+    } else if (!validation.isFullyValid) {
+      const staleDisplayIndex = (validation.firstStaleSentenceIndex ?? 0) + 1;
+      new Notice(`The note changed from sentence ${staleDisplayIndex} onward. Re-synthesize to continue accurately.`);
+    }
+
     const firstReadyIndex = this.sentences.findIndex((sentence) => sentence.audioState === "ready");
     if (firstReadyIndex < 0) {
-      new Notice("Cached synthesis exists but no playable sentence files were found");
+      if (!validation.isFullyValid || !cached.manifest) {
+        new Notice("Cached synthesis is outdated for this note.");
+      } else {
+        new Notice("Cached synthesis exists but no playable sentence files were found");
+      }
       return -1;
     }
 
-    if (cached.manifest && cached.manifest.sentenceCount !== split.length) {
-      new Notice(
-        `Cached synthesis sentence count (${cached.manifest.sentenceCount}) differs from current note (${split.length}). Playing available audio only.`,
-      );
+    if (cached.manifest && !validation.isFullyValid) {
+      const validCount = validation.validSentenceCount;
+      new Notice(`Playing only the first ${validCount} unchanged sentence${validCount === 1 ? "" : "s"} from cache.`);
     }
 
     return firstReadyIndex;
   }
 }
 
+function validateCacheAgainstCurrentSentences(
+  currentNoteText: string,
+  currentSentences: SentenceChunk[],
+  manifest: NoteSynthesisManifest | null,
+): CacheValidationResult {
+  if (!manifest) {
+    return {
+      isFullyValid: false,
+      firstStaleSentenceIndex: 0,
+      validSentenceCount: 0,
+    };
+  }
+
+  const currentSentenceHashes = currentSentences.map((sentence) => hashSentenceText(sentence.text));
+  const currentNoteTextHash = hashNoteText(currentNoteText);
+  const cachedSentenceHashes = manifest.sentenceTextHashes ?? [];
+  const maxComparableCount = Math.min(currentSentenceHashes.length, cachedSentenceHashes.length);
+
+  let firstMismatchIndex: number | null = null;
+  for (let index = 0; index < maxComparableCount; index += 1) {
+    if (currentSentenceHashes[index] !== cachedSentenceHashes[index]) {
+      firstMismatchIndex = index;
+      break;
+    }
+  }
+
+  if (firstMismatchIndex === null && currentSentenceHashes.length !== cachedSentenceHashes.length) {
+    firstMismatchIndex = maxComparableCount;
+  }
+
+  const isFullyValid =
+    firstMismatchIndex === null &&
+    manifest.sentenceCount === currentSentenceHashes.length &&
+    manifest.noteTextHash === currentNoteTextHash;
+
+  if (isFullyValid) {
+    return {
+      isFullyValid: true,
+      firstStaleSentenceIndex: null,
+      validSentenceCount: currentSentenceHashes.length,
+    };
+  }
+
+  return {
+    isFullyValid: false,
+    firstStaleSentenceIndex: firstMismatchIndex ?? 0,
+    validSentenceCount: firstMismatchIndex ?? 0,
+  };
+}
+
 function hashSentenceText(text: string): string {
+  return hashString(text);
+}
+
+function hashNoteText(text: string): string {
   return hashString(text);
 }
 
