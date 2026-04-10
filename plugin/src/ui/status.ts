@@ -97,8 +97,8 @@ export class StatusView {
     this.speedPanelEl.addClass("kokoro-tts-status-speed-panel");
     this.speedSliderEl = document.createElement("input");
     this.speedSliderEl.type = "range";
-    this.speedSliderEl.min = "75";
-    this.speedSliderEl.max = "150";
+    this.speedSliderEl.min = "25";
+    this.speedSliderEl.max = "400";
     this.speedSliderEl.step = "5";
     this.speedSliderEl.value = "100";
     this.speedSliderEl.addClass("kokoro-tts-status-speed-slider");

@@ -25,7 +25,6 @@ export default class KokoroTtsPlugin extends Plugin {
   private client: KokoroClient | null = null;
   private sentences: SentenceChunk[] = [];
   private sentencesNotePath: string | null = null;
-  private isPaused = false;
   private isSynthesizing = false;
   private statusView: StatusView | null = null;
   private lastArrowKey: "ArrowLeft" | "ArrowRight" | null = null;
@@ -67,17 +66,14 @@ export default class KokoroTtsPlugin extends Plugin {
         const oneBasedIndex = sentenceIndex + 1;
         if (state === "playing") {
           this.statusView?.setPlaying(oneBasedIndex, totalSentences);
-          this.isPaused = false;
           return;
         }
         if (state === "paused") {
           this.statusView?.setPaused(oneBasedIndex, totalSentences);
-          this.isPaused = true;
           return;
         }
         if (state === "stopped") {
           this.statusView?.setStopped();
-          this.isPaused = false;
           return;
         }
         if (state === "failed") {
@@ -299,7 +295,6 @@ export default class KokoroTtsPlugin extends Plugin {
       return false;
     }
 
-    this.isPaused = false;
     return true;
   }
 
@@ -308,14 +303,12 @@ export default class KokoroTtsPlugin extends Plugin {
 
     if (playbackState === "playing") {
       this.playback.pause();
-      this.isPaused = true;
       new Notice("Paused Kokoro TTS playback");
       return;
     }
 
-    if (playbackState === "paused" && this.isPaused) {
+    if (playbackState === "paused") {
       await this.playback.resume();
-      this.isPaused = false;
       new Notice("Resumed Kokoro TTS playback");
       return;
     }
@@ -347,7 +340,6 @@ export default class KokoroTtsPlugin extends Plugin {
 
   stopPlayback(): void {
     this.playback.stop();
-    this.isPaused = false;
     this.isSynthesizing = false;
   }
 
