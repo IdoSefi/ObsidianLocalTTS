@@ -7,7 +7,7 @@ Obsidian Kokoro TTS Plugin
 Build a personal-use Obsidian desktop plugin that:
 - synthesizes the active note into sentence-level audio using a locally running Kokoro-82M service
 - creates one persistent audio file per sentence (per note)
-- in Reading view, lets the user click a word and restart playback from the beginning of that word’s sentence
+- in Source mode, lets the user use a context-menu action to restart playback from the current cursor sentence
 - supports pause/resume and stop
 - reuses prior note synthesis without forcing regeneration
 - starts playback as soon as the first sentence is ready while synthesis is still running
@@ -29,6 +29,7 @@ Build a personal-use Obsidian desktop plugin that:
 
 ## Out of scope
 - Mobile support
+- Reading-view click-to-sentence restart
 - Live Preview DOM click-to-offset mapping
 - Word-level timestamp alignment
 - Multi-note batch processing
@@ -48,8 +49,8 @@ Build a personal-use Obsidian desktop plugin that:
 - Request audio generation from local Kokoro server
 - Store/reload note synthesis from vault `audio_synthesis/<note-key>/`
 - Persist lightweight per-note synthesis manifest
-- Register Reading view DOM hooks
-- Map click target to sentence
+- Register Source mode editor context-menu hooks
+- Map editor cursor offset to sentence
 - Control playback
 - Wait for pending sentences during ongoing synthesis
 - Show status/errors to user
@@ -98,7 +99,7 @@ Build a personal-use Obsidian desktop plugin that:
 4. Plugin splits the note and generates sentence audio files into vault cache
 5. Playback starts automatically as soon as the first ready sentence exists
 6. Playback continues sentence-by-sentence while later sentences are still generating
-7. User can click any rendered word to restart from that sentence
+7. User can right-click in Source mode and choose “Start reading from here”
 8. User can pause/resume/stop
 9. Later, user clicks “Play active note” to replay cached synthesis without regeneration
 
@@ -146,7 +147,7 @@ Build a personal-use Obsidian desktop plugin that:
 - Playback can begin before synthesis fully completes
 - Pause/resume works reliably
 - Stop works reliably
-- Clicking a word in Reading view restarts from that sentence
+- In Source mode, context-menu “Start reading from here” restarts from cursor sentence
 - No cloud dependency exists
 
 # Notes for agents

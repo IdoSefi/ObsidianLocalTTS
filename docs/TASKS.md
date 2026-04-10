@@ -17,9 +17,9 @@
 | T-009 | Implement sequential audio playback controller | DONE | agent | T-008 | HTMLAudio sequential sentence playback with auto-next + wait-for-ready polling |
 | T-010 | Implement pause/resume/stop commands | DONE | agent | T-009 | Pause/resume now falls back to cached play when idle |
 | T-011 | Add synthesize/play/stop UI controls | DONE | agent | T-010 | Ribbon controls wired to synth + play/pause + stop |
-| T-012 | Register Reading view hooks | DONE | agent | T-001 | Document click listener gated to Markdown Reading view |
-| T-013 | Map clicked rendered word to sentence id | DONE | agent | T-005,T-012 | Caret-based click-to-rendered-text offset mapping added |
-| T-014 | Restart playback from clicked sentence | DONE | agent | T-013,T-009 | Sentence lookup and playback restart on click |
+| T-012 | Register Reading view hooks | DONE | agent | T-001 | Implemented previously; later removed in T-035 |
+| T-013 | Map clicked rendered word to sentence id | DONE | agent | T-005,T-012 | Implemented previously; later removed in T-035 |
+| T-014 | Restart playback from clicked sentence | DONE | agent | T-013,T-009 | Implemented previously; later removed in T-035 |
 | T-015 | Cleanup temp files on unload | DONE | agent | T-006 | Superseded in v1.1 by persistent per-note vault cache |
 | T-016 | Cleanup stale temp files on startup | DONE | agent | T-006 | Superseded in v1.1 by persistent per-note vault cache |
 | T-017 | Add settings tab | IN_PROGRESS | agent | T-001 | Core fields shipped (server URL, voice, speed); validation/polish remaining |
@@ -41,3 +41,4 @@
 | T-032 | Add status-bar play/stop buttons beside slider | DONE | agent | T-025 | Added status bar buttons wired to pause/resume/play and stop actions next to seek slider |
 | T-033 | Add source-mode editor-model playback support | DONE | agent | T-004,T-013,T-014 | Commands/ribbon now support Source mode text, plus cursor-offset sentence restart via editor APIs (`getCursor` + `posToOffset`) |
 | T-034 | Add Source mode context-menu restart action | DONE | agent | T-033 | Source mode restart now runs from editor right-click menu item `Start reading from here` |
+| T-035 | Disable Reading mode sentence-restart hooks and remove mapping code | DONE | agent | T-034 | Removed Reading view click hook + rendered DOM mapping module to keep restart action Source-mode-only |

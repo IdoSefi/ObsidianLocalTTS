@@ -9,7 +9,6 @@ import { findSentenceByOffset, splitIntoSentences } from "./sentence/splitter";
 import type { NoteSynthesisManifest, PluginSettings, SentenceChunk } from "./types";
 import { registerUiControls } from "./ui/controls";
 import { StatusView } from "./ui/status";
-import { registerReadingViewHooks } from "./view/readingModeHooks";
 import { registerSourceModeHooks } from "./view/sourceModeHooks";
 
 export default class KokoroTtsPlugin extends Plugin {
@@ -74,7 +73,6 @@ export default class KokoroTtsPlugin extends Plugin {
 
     this.addSettingTab(new KokoroTtsSettingTab(this.app, this));
     registerUiControls(this);
-    registerReadingViewHooks(this);
     registerSourceModeHooks(this);
 
     this.addCommand({

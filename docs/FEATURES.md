@@ -13,7 +13,7 @@
 | F-003 | Sequential playback | COMPLETE | Play sentence files in note order | Auto-advance on audio end; skips failures |
 | F-004 | Pause/resume | COMPLETE | Pause and continue current playback | Command + ribbon support |
 | F-005 | Stop playback | COMPLETE | Stop current playback and reset state | Command + ribbon support |
-| F-006 | Click word to restart sentence | COMPLETE | In Reading view, clicking a word restarts from that sentence | Caret-based mapping in rendered Reading view |
+| F-006 | Click word to restart sentence | DEFERRED | In Reading view, clicking a word restarts from that sentence | Disabled to simplify behavior; Source mode context-menu restart is supported |
 | F-007 | Play active note from cache | COMPLETE | Replay current note without regeneration | New command: `Play active note from cached synthesis` |
 | F-008 | Explicit regenerate behavior | COMPLETE | Synthesize command replaces old per-note audio | Note folder is recreated before synth run |
 | F-009 | Auto-start while generating | COMPLETE | Playback starts once first ready sentence exists | Later sentences can still be generating |
