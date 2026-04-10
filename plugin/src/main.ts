@@ -5,11 +5,12 @@ import { VaultAudioCache } from "./audio/cache";
 import { KokoroClient } from "./audio/kokoroClient";
 import { PlaybackController } from "./audio/playback";
 import { DEFAULT_SETTINGS, KokoroTtsSettingTab } from "./settings";
-import { splitIntoSentences } from "./sentence/splitter";
+import { findSentenceByOffset, splitIntoSentences } from "./sentence/splitter";
 import type { NoteSynthesisManifest, PluginSettings, SentenceChunk } from "./types";
 import { registerUiControls } from "./ui/controls";
 import { StatusView } from "./ui/status";
 import { registerReadingViewHooks } from "./view/readingModeHooks";
+import { registerSourceModeHooks } from "./view/sourceModeHooks";
 
 export default class KokoroTtsPlugin extends Plugin {
   settings: PluginSettings = DEFAULT_SETTINGS;
@@ -74,6 +75,7 @@ export default class KokoroTtsPlugin extends Plugin {
     this.addSettingTab(new KokoroTtsSettingTab(this.app, this));
     registerUiControls(this);
     registerReadingViewHooks(this);
+    registerSourceModeHooks(this);
 
     this.addCommand({
       id: "synthesize-active-note",
@@ -337,15 +339,34 @@ export default class KokoroTtsPlugin extends Plugin {
     this.isSynthesizing = false;
   }
 
-  private getPreparedActiveNote(): { notePath: string; text: string } | null {
+  async restartPlaybackFromSourceCursor(): Promise<void> {
+    const prepared = this.getPreparedActiveNote("source");
+    if (!prepared) {
+      return;
+    }
+
+    const sentence = findSentenceByOffset(this.sentences, prepared.offset);
+    if (!sentence) {
+      return;
+    }
+
+    const started = await this.playFromSentence(sentence.id, true);
+    if (started) {
+      new Notice(`Restarted from sentence ${sentence.id + 1}`);
+    }
+  }
+
+  private getPreparedActiveNote(
+    requiredMode?: "preview" | "source",
+  ): { notePath: string; text: string; mode: "preview" | "source"; offset: number } | null {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (!view) {
       new Notice("No active Markdown note found");
       return null;
     }
 
-    if (view.getMode() !== "preview") {
-      new Notice("Switch to Reading view before using Kokoro TTS");
+    const mode = view.getMode();
+    if (requiredMode && mode !== requiredMode) {
       return null;
     }
 
@@ -355,13 +376,31 @@ export default class KokoroTtsPlugin extends Plugin {
       return null;
     }
 
+    if (mode === "source") {
+      const editor = view.editor;
+      if (!editor) {
+        new Notice("No active editor found for Source mode");
+        return null;
+      }
+
+      const text = editor.getValue();
+      if (!text.trim()) {
+        new Notice("The active note is empty");
+        return null;
+      }
+
+      const cursor = editor.getCursor();
+      const offset = editor.posToOffset(cursor);
+      return { notePath, text, mode, offset };
+    }
+
     const text = view.contentEl.innerText ?? view.data;
     if (!text.trim()) {
       new Notice("The active note is empty");
       return null;
     }
 
-    return { notePath, text };
+    return { notePath, text, mode: "preview", offset: 0 };
   }
 
   private buildManifest(notePath: string, sentences: SentenceChunk[]): NoteSynthesisManifest {

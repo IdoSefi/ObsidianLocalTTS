@@ -12,10 +12,11 @@ Build a personal-use Obsidian desktop plugin that:
 - reuses prior note synthesis without forcing regeneration
 - starts playback as soon as the first sentence is ready while synthesis is still running
 
-# Scope for v1.1
+# Scope for v1.2
 ## In scope
 - Obsidian desktop only
-- Reading view only
+- Reading view support
+- Source mode (edit mode) support for synth/play and cursor-based sentence restart
 - Active note only
 - One audio file per sentence
 - Localhost communication with a local Kokoro server
@@ -28,7 +29,7 @@ Build a personal-use Obsidian desktop plugin that:
 
 ## Out of scope
 - Mobile support
-- Live Preview / Source mode click support
+- Live Preview DOM click-to-offset mapping
 - Word-level timestamp alignment
 - Multi-note batch processing
 - Community plugin release process
