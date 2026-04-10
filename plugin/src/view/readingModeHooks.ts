@@ -1,97 +1,56 @@
 import { MarkdownView, Notice } from "obsidian";
 import type KokoroTtsPlugin from "../main";
-import { resolveRenderedClickToTextOffset } from "../sentence/mapping";
-import { findNearestSentenceByOffset, findSentenceByOffset, splitIntoSentences } from "../sentence/splitter";
-import type { SentenceChunk } from "../types";
+import { annotateRenderedSentences } from "../sentence/tagging";
+
+const SENTENCE_ID_SELECTOR = "[data-kokoro-sentence-id]";
 
 export function registerReadingViewHooks(plugin: KokoroTtsPlugin): void {
+  plugin.registerMarkdownPostProcessor((element) => {
+    annotateRenderedSentences(element, plugin.getSentences());
+  });
+
   plugin.registerDomEvent(document, "click", async (event) => {
     const activeView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!activeView) {
-      return;
-    }
-
-    if (activeView.getMode() !== "preview") {
+    if (!activeView || activeView.getMode() !== "preview") {
       return;
     }
 
     const root = activeView.contentEl;
-    const mapping = resolveRenderedClickToTextOffset(root, event.target, event);
-    if (mapping.offset === null) {
-      console.debug("[KokoroTTS][debug] Click mapping failed: offset was null", {
-        target: event.target,
-        mode: activeView.getMode(),
-      });
-      new Notice("debug: click mapping failed (offset null)");
+    const targetElement = asElement(event.target);
+    if (!targetElement || !root.contains(targetElement)) {
       return;
     }
 
-    const renderedText = readRenderedText(root);
-    const renderedSentences = splitIntoSentences(renderedText);
-    const renderedSentence = findSentenceByOffset(renderedSentences, mapping.offset);
-    const resolvedRenderedSentence = renderedSentence ?? findNearestSentenceByOffset(renderedSentences, mapping.offset);
-    if (!resolvedRenderedSentence) {
-      console.debug("[KokoroTTS][debug] Click offset had no rendered sentence", {
-        offset: mapping.offset,
-        renderedSentenceCount: renderedSentences.length,
-      });
-      new Notice(`debug: no rendered sentence for offset ${mapping.offset}`);
+    const sentenceElement = findSentenceElement(targetElement);
+    if (!sentenceElement) {
+      annotateRenderedSentences(root, plugin.getSentences());
+    }
+
+    const resolvedSentenceElement = sentenceElement ?? findSentenceElement(targetElement);
+    if (!resolvedSentenceElement) {
       return;
     }
 
-    const pluginSentence = resolvePluginSentence(plugin.getSentences(), resolvedRenderedSentence);
-    if (!pluginSentence) {
-      console.debug("[KokoroTTS][debug] Could not map rendered sentence to plugin sentence", {
-        offset: mapping.offset,
-        renderedSentenceId: resolvedRenderedSentence.id,
-        renderedSentenceText: resolvedRenderedSentence.text,
-      });
-      new Notice(`debug: no plugin sentence for offset ${mapping.offset}`);
+    const sentenceId = Number(resolvedSentenceElement.getAttribute("data-kokoro-sentence-id"));
+    if (!Number.isInteger(sentenceId) || sentenceId < 0) {
       return;
     }
 
-    if (!renderedSentence) {
-      console.debug("[KokoroTTS][debug] Using nearest rendered sentence fallback for click offset", {
-        offset: mapping.offset,
-        sentenceId: pluginSentence.id,
-      });
-      new Notice(`debug: nearest sentence fallback for offset ${mapping.offset}`);
-    }
-
-    new Notice(`start reading from sentence ${pluginSentence.id + 1}`);
-    await plugin.requestPlaybackFromSentence(pluginSentence.id);
+    new Notice(`start reading from sentence ${sentenceId + 1}`);
+    await plugin.requestPlaybackFromSentence(sentenceId);
   });
 }
 
-function readRenderedText(root: HTMLElement): string {
-  return root.innerText ?? root.textContent ?? "";
+function asElement(target: EventTarget | null): Element | null {
+  if (target instanceof Element) {
+    return target;
+  }
+  if (target instanceof Text) {
+    return target.parentElement;
+  }
+  return null;
 }
 
-function resolvePluginSentence(
-  pluginSentences: SentenceChunk[],
-  renderedSentence: SentenceChunk,
-): SentenceChunk | undefined {
-  const byIndex = pluginSentences[renderedSentence.id];
-  if (byIndex && normalizeSentenceText(byIndex.text) === normalizeSentenceText(renderedSentence.text)) {
-    return byIndex;
-  }
-
-  const normalizedRenderedText = normalizeSentenceText(renderedSentence.text);
-  const matchingSentences = pluginSentences.filter(
-    (sentence) => normalizeSentenceText(sentence.text) === normalizedRenderedText,
-  );
-  if (matchingSentences.length === 1) {
-    return matchingSentences[0];
-  }
-  if (matchingSentences.length > 1) {
-    return matchingSentences.reduce((closest, current) =>
-      Math.abs(current.id - renderedSentence.id) < Math.abs(closest.id - renderedSentence.id) ? current : closest,
-    );
-  }
-
-  return byIndex;
-}
-
-function normalizeSentenceText(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
+function findSentenceElement(target: Element): Element | null {
+  return target.closest(SENTENCE_ID_SELECTOR);
 }

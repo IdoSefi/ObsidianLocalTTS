@@ -36,33 +36,3 @@ export function splitIntoSentences(text: string): SentenceChunk[] {
 export function findSentenceByOffset(sentences: SentenceChunk[], offset: number): SentenceChunk | undefined {
   return sentences.find((sentence) => offset >= sentence.from && offset < sentence.to);
 }
-
-export function findNearestSentenceByOffset(sentences: SentenceChunk[], offset: number): SentenceChunk | undefined {
-  if (sentences.length === 0) {
-    return undefined;
-  }
-
-  let nearest = sentences[0];
-  let nearestDistance = distanceToSentence(offset, nearest);
-
-  for (let index = 1; index < sentences.length; index += 1) {
-    const sentence = sentences[index];
-    const distance = distanceToSentence(offset, sentence);
-    if (distance < nearestDistance) {
-      nearest = sentence;
-      nearestDistance = distance;
-    }
-  }
-
-  return nearest;
-}
-
-function distanceToSentence(offset: number, sentence: SentenceChunk): number {
-  if (offset < sentence.from) {
-    return sentence.from - offset;
-  }
-  if (offset >= sentence.to) {
-    return offset - sentence.to + 1;
-  }
-  return 0;
-}
