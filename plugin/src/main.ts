@@ -5,11 +5,11 @@ import { VaultAudioCache } from "./audio/cache";
 import { KokoroClient } from "./audio/kokoroClient";
 import { PlaybackController } from "./audio/playback";
 import { DEFAULT_SETTINGS, KokoroTtsSettingTab } from "./settings";
-import { splitIntoSentences } from "./sentence/splitter";
+import { findSentenceByOffset, splitIntoSentences } from "./sentence/splitter";
 import type { NoteSynthesisManifest, PluginSettings, SentenceChunk } from "./types";
 import { registerUiControls } from "./ui/controls";
 import { StatusView } from "./ui/status";
-import { registerReadingViewHooks } from "./view/readingModeHooks";
+import { registerSourceModeHooks } from "./view/sourceModeHooks";
 
 export default class KokoroTtsPlugin extends Plugin {
   settings: PluginSettings = DEFAULT_SETTINGS;
@@ -17,6 +17,7 @@ export default class KokoroTtsPlugin extends Plugin {
   private readonly cache = new VaultAudioCache(this.app);
   private client: KokoroClient | null = null;
   private sentences: SentenceChunk[] = [];
+  private sentencesNotePath: string | null = null;
   private isPaused = false;
   private isSynthesizing = false;
   private statusView: StatusView | null = null;
@@ -73,7 +74,7 @@ export default class KokoroTtsPlugin extends Plugin {
 
     this.addSettingTab(new KokoroTtsSettingTab(this.app, this));
     registerUiControls(this);
-    registerReadingViewHooks(this);
+    registerSourceModeHooks(this);
 
     this.addCommand({
       id: "synthesize-active-note",
@@ -132,6 +133,7 @@ export default class KokoroTtsPlugin extends Plugin {
     }
 
     this.sentences = splitIntoSentences(prepared.text);
+    this.sentencesNotePath = prepared.notePath;
     if (this.sentences.length === 0) {
       new Notice("No readable sentences found in the active note");
       return;
@@ -240,44 +242,9 @@ export default class KokoroTtsPlugin extends Plugin {
 
     const notePath = prepared.notePath;
     const split = splitIntoSentences(prepared.text);
-    if (split.length === 0) {
-      new Notice("No readable sentences found in the active note");
-      return;
-    }
-
-    const cached = await this.cache.listExistingSentenceAudio(notePath);
-    if (cached.files.length === 0) {
-      new Notice("No cached synthesis found. Run 'Synthesize active note' first.");
-      return;
-    }
-
-    const filesBySentence = new Map(cached.files.map((item) => [item.sentenceId, item.audioPath]));
-    this.sentences = split.map((sentence) => {
-      const audioPath = filesBySentence.get(sentence.id);
-      if (!audioPath) {
-        return {
-          ...sentence,
-          audioState: "error" as const,
-        };
-      }
-      return {
-        ...sentence,
-        audioPath,
-        audioState: "ready" as const,
-      };
-    });
-
-    this.playback.setSentences(this.sentences);
-    const firstReadyIndex = this.sentences.findIndex((sentence) => sentence.audioState === "ready");
+    const firstReadyIndex = await this.loadSentencesFromCache(notePath, split);
     if (firstReadyIndex < 0) {
-      new Notice("Cached synthesis exists but no playable sentence files were found");
       return;
-    }
-
-    if (cached.manifest && cached.manifest.sentenceCount !== split.length) {
-      new Notice(
-        `Cached synthesis sentence count (${cached.manifest.sentenceCount}) differs from current note (${split.length}). Playing available audio only.`,
-      );
     }
 
     await this.playFromSentence(firstReadyIndex);
@@ -337,15 +304,42 @@ export default class KokoroTtsPlugin extends Plugin {
     this.isSynthesizing = false;
   }
 
-  private getPreparedActiveNote(): { notePath: string; text: string } | null {
+  async restartPlaybackFromSourceCursor(): Promise<void> {
+    const prepared = this.getPreparedActiveNote("source");
+    if (!prepared) {
+      return;
+    }
+
+    const split = splitIntoSentences(prepared.text);
+    const sentence = findSentenceByOffset(split, prepared.offset);
+    if (!sentence) {
+      return;
+    }
+
+    if (this.sentencesNotePath !== prepared.notePath || this.sentences.length === 0) {
+      const firstReadyIndex = await this.loadSentencesFromCache(prepared.notePath, split);
+      if (firstReadyIndex < 0) {
+        return;
+      }
+    }
+
+    const started = await this.playFromSentence(sentence.id, true);
+    if (started) {
+      new Notice(`Restarted from sentence ${sentence.id + 1}`);
+    }
+  }
+
+  private getPreparedActiveNote(
+    requiredMode?: "preview" | "source",
+  ): { notePath: string; text: string; mode: "preview" | "source"; offset: number } | null {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (!view) {
       new Notice("No active Markdown note found");
       return null;
     }
 
-    if (view.getMode() !== "preview") {
-      new Notice("Switch to Reading view before using Kokoro TTS");
+    const mode = view.getMode();
+    if (requiredMode && mode !== requiredMode) {
       return null;
     }
 
@@ -355,13 +349,31 @@ export default class KokoroTtsPlugin extends Plugin {
       return null;
     }
 
+    if (mode === "source") {
+      const editor = view.editor;
+      if (!editor) {
+        new Notice("No active editor found for Source mode");
+        return null;
+      }
+
+      const text = editor.getValue();
+      if (!text.trim()) {
+        new Notice("The active note is empty");
+        return null;
+      }
+
+      const cursor = editor.getCursor();
+      const offset = editor.posToOffset(cursor);
+      return { notePath, text, mode, offset };
+    }
+
     const text = view.contentEl.innerText ?? view.data;
     if (!text.trim()) {
       new Notice("The active note is empty");
       return null;
     }
 
-    return { notePath, text };
+    return { notePath, text, mode: "preview", offset: 0 };
   }
 
   private buildManifest(notePath: string, sentences: SentenceChunk[]): NoteSynthesisManifest {
@@ -371,6 +383,51 @@ export default class KokoroTtsPlugin extends Plugin {
       generatedAt: new Date().toISOString(),
       sentenceTextHashes: sentences.map((sentence) => hashSentenceText(sentence.text)),
     };
+  }
+
+  private async loadSentencesFromCache(notePath: string, split: SentenceChunk[]): Promise<number> {
+    if (split.length === 0) {
+      new Notice("No readable sentences found in the active note");
+      return -1;
+    }
+
+    const cached = await this.cache.listExistingSentenceAudio(notePath);
+    if (cached.files.length === 0) {
+      new Notice("No cached synthesis found. Run 'Synthesize active note' first.");
+      return -1;
+    }
+
+    const filesBySentence = new Map(cached.files.map((item) => [item.sentenceId, item.audioPath]));
+    this.sentences = split.map((sentence) => {
+      const audioPath = filesBySentence.get(sentence.id);
+      if (!audioPath) {
+        return {
+          ...sentence,
+          audioState: "error" as const,
+        };
+      }
+      return {
+        ...sentence,
+        audioPath,
+        audioState: "ready" as const,
+      };
+    });
+    this.sentencesNotePath = notePath;
+    this.playback.setSentences(this.sentences);
+
+    const firstReadyIndex = this.sentences.findIndex((sentence) => sentence.audioState === "ready");
+    if (firstReadyIndex < 0) {
+      new Notice("Cached synthesis exists but no playable sentence files were found");
+      return -1;
+    }
+
+    if (cached.manifest && cached.manifest.sentenceCount !== split.length) {
+      new Notice(
+        `Cached synthesis sentence count (${cached.manifest.sentenceCount}) differs from current note (${split.length}). Playing available audio only.`,
+      );
+    }
+
+    return firstReadyIndex;
   }
 }
 
