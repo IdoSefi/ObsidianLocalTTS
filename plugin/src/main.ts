@@ -28,6 +28,9 @@ export default class KokoroTtsPlugin extends Plugin {
   private isPaused = false;
   private isSynthesizing = false;
   private statusView: StatusView | null = null;
+  private lastArrowKey: "ArrowLeft" | "ArrowRight" | null = null;
+  private lastArrowKeyTs = 0;
+  private readonly arrowDoublePressWindowMs = 300;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -44,6 +47,17 @@ export default class KokoroTtsPlugin extends Plugin {
     this.statusView.setStopHandler(() => {
       this.stopPlayback();
     });
+    this.statusView.setPreviousSentenceHandler(() => {
+      void this.playPreviousSentence();
+    });
+    this.statusView.setNextSentenceHandler(() => {
+      void this.playNextSentence();
+    });
+    this.statusView.setPlaybackRateHandler((rate) => {
+      this.playback.setPlaybackRate(rate);
+      this.statusView?.setPlaybackRate(this.playback.getPlaybackRate());
+    });
+    this.statusView.setPlaybackRate(this.playback.getPlaybackRate());
 
     this.playback.setCallbacks({
       onProgress: ({ currentTime, duration }) => {
@@ -70,6 +84,10 @@ export default class KokoroTtsPlugin extends Plugin {
           this.statusView?.setFailed(message);
         }
       },
+    });
+
+    this.registerDomEvent(document, "keydown", (event: KeyboardEvent) => {
+      void this.handleArrowDoublePress(event);
     });
 
     this.playback.setWaitForSentenceReadyHandler((sentenceIndex, sentence) => {
@@ -305,10 +323,69 @@ export default class KokoroTtsPlugin extends Plugin {
     await this.playActiveNoteFromCache();
   }
 
+  async playPreviousSentence(): Promise<void> {
+    if (!this.isSentenceMovementAllowed()) {
+      return;
+    }
+    const currentIndex = this.playback.getCurrentIndex();
+    if (currentIndex <= 0) {
+      return;
+    }
+    await this.playFromSentence(currentIndex - 1, true);
+  }
+
+  async playNextSentence(): Promise<void> {
+    if (!this.isSentenceMovementAllowed()) {
+      return;
+    }
+    const currentIndex = this.playback.getCurrentIndex();
+    if (currentIndex >= this.sentences.length - 1) {
+      return;
+    }
+    await this.playFromSentence(currentIndex + 1, true);
+  }
+
   stopPlayback(): void {
     this.playback.stop();
     this.isPaused = false;
     this.isSynthesizing = false;
+  }
+
+  private isSentenceMovementAllowed(): boolean {
+    const playbackState = this.playback.getState();
+    return playbackState === "playing" || playbackState === "paused";
+  }
+
+  private async handleArrowDoublePress(event: KeyboardEvent): Promise<void> {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
+      this.lastArrowKey = null;
+      this.lastArrowKeyTs = 0;
+      return;
+    }
+
+    if (!this.isSentenceMovementAllowed()) {
+      this.lastArrowKey = event.key;
+      this.lastArrowKeyTs = Date.now();
+      return;
+    }
+
+    const now = Date.now();
+    const isDoublePress =
+      this.lastArrowKey === event.key && now - this.lastArrowKeyTs <= this.arrowDoublePressWindowMs;
+    this.lastArrowKey = event.key;
+    this.lastArrowKeyTs = now;
+
+    if (!isDoublePress) {
+      return;
+    }
+
+    this.lastArrowKey = null;
+    this.lastArrowKeyTs = 0;
+    if (event.key === "ArrowLeft") {
+      await this.playPreviousSentence();
+      return;
+    }
+    await this.playNextSentence();
   }
 
   async restartPlaybackFromSourceCursor(): Promise<void> {
