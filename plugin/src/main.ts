@@ -306,6 +306,12 @@ export default class KokoroTtsPlugin extends Plugin {
 
     const started = await this.playback.playFromSentence(index, allowWaitForReady);
     if (!started) {
+      const isPendingWhileSynthesizing =
+        allowWaitForReady && this.isSynthesizing && sentence.audioState !== "ready" && sentence.audioState !== "error";
+      if (isPendingWhileSynthesizing) {
+        console.info(`[KokoroTTS] Waiting for sentence ${index + 1} audio to become ready...`);
+        return false;
+      }
       const audioPath = sentence.audioPath ?? "unknown path";
       const message = `Could not start playback for sentence ${index + 1}`;
       console.error(`[KokoroTTS] ${message}. Audio path: ${audioPath}`);

@@ -95,8 +95,16 @@ export class PlaybackController {
 
     const sentence = await this.waitForSentence(index, runId, allowWaitingForPendingSentence);
     if (!sentence) {
+      const targetSentence = this.sentences[index];
+      const isPendingWhileWaitingAllowed =
+        allowWaitingForPendingSentence &&
+        targetSentence !== undefined &&
+        targetSentence.audioState !== "ready" &&
+        targetSentence.audioState !== "error";
       if (runId === this.playbackRunId) {
-        this.emitState("failed", "Audio file is missing or not ready for the selected sentence");
+        if (!isPendingWhileWaitingAllowed) {
+          this.emitState("failed", "Audio file is missing or not ready for the selected sentence");
+        }
       }
       return false;
     }
