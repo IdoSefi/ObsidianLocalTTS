@@ -20,6 +20,7 @@ export interface PlaybackStateEvent {
 export interface PlaybackControllerCallbacks {
   onProgress?: (event: PlaybackProgressEvent) => void;
   onStateChange?: (event: PlaybackStateEvent) => void;
+  onWaitingForSentence?: (event: { sentenceIndex: number; totalSentences: number }) => void;
 }
 
 interface AudioListeners {
@@ -175,6 +176,8 @@ export class PlaybackController {
     runId: number,
     allowWaiting: boolean,
   ): Promise<SentenceChunk | null> {
+    let waitingNotified = false;
+
     while (true) {
       if (runId !== this.playbackRunId) {
         return null;
@@ -200,6 +203,14 @@ export class PlaybackController {
 
       if (!shouldWait) {
         return null;
+      }
+
+      if (!waitingNotified) {
+        this.callbacks.onWaitingForSentence?.({
+          sentenceIndex,
+          totalSentences: this.sentences.length,
+        });
+        waitingNotified = true;
       }
 
       await sleep(250);

@@ -69,6 +69,9 @@ export default class KokoroTtsPlugin extends Plugin {
       onProgress: ({ currentTime, duration }) => {
         this.statusView?.setProgress(currentTime, duration);
       },
+      onWaitingForSentence: ({ sentenceIndex, totalSentences }) => {
+        new Notice(`Waiting for sentence ${sentenceIndex + 1}/${totalSentences} to finish synthesizing...`);
+      },
       onStateChange: ({ state, sentenceIndex, totalSentences, message }) => {
         const oneBasedIndex = sentenceIndex + 1;
         this.syncSourceModePlaybackHighlight(state, sentenceIndex);
