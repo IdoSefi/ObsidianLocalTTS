@@ -28,13 +28,16 @@ export interface NoteSynthesisManifest {
 
 export interface PluginSettings {
   serverUrl: string;
-  voice: string;
+  backend: "kokoro" | "piper";
+  kokoroVoice: string;
+  piperVoice: string;
   speed: number;
 }
 
 export interface SynthesisRequest {
   sessionId: string;
   sentenceId: number;
+  backend: "kokoro" | "piper";
   text: string;
   voice: string;
   speed: number;

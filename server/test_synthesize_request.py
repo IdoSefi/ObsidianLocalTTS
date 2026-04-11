@@ -42,6 +42,7 @@ def main() -> int:
     payload = {
         "sessionId": f"standalone-{uuid.uuid4().hex[:10]}",
         "sentenceId": 0,
+        "backend": "kokoro",
         "text": (
             "Local speech synthesis should feel immediate and dependable. "
             "This standalone request checks that the FastAPI bridge can accept text, "

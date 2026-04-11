@@ -13,7 +13,7 @@ export interface SynthesizeAttemptResult {
   attempted: boolean;
 }
 
-export class KokoroClient {
+export class LocalTtsClient {
   constructor(private readonly settings: PluginSettings) {}
 
   async synthesizeSentence(request: SynthesisRequest): Promise<SynthesizeAttemptResult> {

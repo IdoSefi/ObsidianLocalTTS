@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import { dirname } from "node:path";
 import { MarkdownView, Notice, Plugin } from "obsidian";
 import { VaultAudioCache } from "./audio/cache";
-import { KokoroClient } from "./audio/kokoroClient";
+import { LocalTtsClient } from "./audio/kokoroClient";
 import { PlaybackController } from "./audio/playback";
 import { DEFAULT_SETTINGS, KokoroTtsSettingTab } from "./settings";
 import { normalizeSentenceForSpeech } from "./sentence/normalize";
@@ -29,7 +29,7 @@ export default class KokoroTtsPlugin extends Plugin {
   settings: PluginSettings = DEFAULT_SETTINGS;
   private readonly playback = new PlaybackController();
   private readonly cache = new VaultAudioCache(this.app);
-  private client: KokoroClient | null = null;
+  private client: LocalTtsClient | null = null;
   private sentences: SentenceChunk[] = [];
   private sentencesNotePath: string | null = null;
   private isSynthesizing = false;
@@ -41,7 +41,8 @@ export default class KokoroTtsPlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
-    this.client = new KokoroClient(this.settings);
+    this.normalizeSettingsForBackendScope();
+    this.client = new LocalTtsClient(this.settings);
 
     this.statusView = new StatusView(this);
     this.statusView.setSeekHandler((seconds) => {
@@ -151,6 +152,22 @@ export default class KokoroTtsPlugin extends Plugin {
         this.stopPlayback();
       },
     });
+
+    this.addCommand({
+      id: "use-kokoro-backend",
+      name: "Use Kokoro TTS backend",
+      callback: async () => {
+        await this.switchBackend("kokoro");
+      },
+    });
+
+    this.addCommand({
+      id: "use-piper-backend",
+      name: "Use Piper TTS backend",
+      callback: async () => {
+        await this.switchBackend("piper");
+      },
+    });
   }
 
   async onunload(): Promise<void> {
@@ -158,12 +175,45 @@ export default class KokoroTtsPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const loaded = Object.assign({}, DEFAULT_SETTINGS, await this.loadData()) as PluginSettings & {
+      voice?: string;
+    };
+    if (loaded.voice && !loaded.kokoroVoice) {
+      loaded.kokoroVoice = loaded.voice;
+    }
+    this.settings = loaded;
   }
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
-    this.client = new KokoroClient(this.settings);
+    this.client = new LocalTtsClient(this.settings);
+  }
+
+  private normalizeSettingsForBackendScope(): void {
+    if (!this.settings.kokoroVoice?.trim()) {
+      this.settings.kokoroVoice = DEFAULT_SETTINGS.kokoroVoice;
+    }
+    this.settings.piperVoice = "en_US-lessac-high";
+    if (this.settings.backend !== "kokoro" && this.settings.backend !== "piper") {
+      this.settings.backend = "kokoro";
+    }
+  }
+
+  private async switchBackend(backend: PluginSettings["backend"]): Promise<void> {
+    if (this.settings.backend === backend) {
+      new Notice(`Local TTS backend already set to ${backend === "kokoro" ? "Kokoro" : "Piper"}`);
+      return;
+    }
+    this.settings.backend = backend;
+    if (backend === "piper") {
+      this.settings.piperVoice = "en_US-lessac-high";
+    }
+    await this.saveSettings();
+    new Notice(`Switched TTS backend to ${backend === "kokoro" ? "Kokoro" : "Piper (en_US-lessac-high)"}`);
+  }
+
+  private getActiveBackendVoice(): string {
+    return this.settings.backend === "piper" ? this.settings.piperVoice : this.settings.kokoroVoice;
   }
 
   getSentences(): SentenceChunk[] {
@@ -187,18 +237,19 @@ export default class KokoroTtsPlugin extends Plugin {
     this.playback.setSentences(this.sentences);
 
     if (!this.client) {
-      new Notice("Kokoro client is not initialized");
+      new Notice("Local TTS client is not initialized");
       this.statusView?.setFailed("Client not initialized");
       return;
     }
 
     const total = this.sentences.length;
     const notePath = prepared.notePath;
-    const folder = await this.cache.prepareNoteSynthesisFolder(notePath, true);
-    const tempOutputDir = await this.cache.prepareTempSynthesisFolder(notePath, true);
+    const backend = this.settings.backend;
+    await this.cache.prepareNoteSynthesisFolder(notePath, backend, true);
+    const tempOutputDir = await this.cache.prepareTempSynthesisFolder(notePath, backend, true);
     const sessionId = `note-${Date.now()}`;
 
-    await this.cache.writeManifest(notePath, this.buildManifest(notePath, prepared.text, this.sentences));
+    await this.cache.writeManifest(notePath, backend, this.buildManifest(notePath, prepared.text, this.sentences));
 
     new Notice(`Starting synthesis for ${total} sentences`);
     this.statusView?.setSynthesizing(0, total);
@@ -207,7 +258,7 @@ export default class KokoroTtsPlugin extends Plugin {
     if (!health.ok) {
       const healthMessage = health.error ?? (health.status ? `HTTP ${health.status}` : "unknown error");
       this.statusView?.setFailed("Health check failed");
-      new Notice(`Kokoro server health check failed: ${healthMessage}`);
+      new Notice(`Local TTS server health check failed: ${healthMessage}`);
       return;
     }
 
@@ -226,8 +277,9 @@ export default class KokoroTtsPlugin extends Plugin {
         const { response: result } = await this.client.synthesizeSentence({
           sessionId,
           sentenceId: sentence.id,
+          backend,
           text: sentence.spokenText ?? sentence.text,
-          voice: this.settings.voice,
+          voice: this.getActiveBackendVoice(),
           speed: this.settings.speed,
           outputDir: tempOutputDir,
         });
@@ -240,7 +292,7 @@ export default class KokoroTtsPlugin extends Plugin {
           continue;
         }
 
-        const persistentAudioPath = this.cache.getSentenceAudioAbsolutePath(notePath, sentence.id);
+        const persistentAudioPath = this.cache.getSentenceAudioAbsolutePath(notePath, backend, sentence.id);
         await fs.mkdir(dirname(persistentAudioPath), { recursive: true });
         await fs.copyFile(result.audioPath, persistentAudioPath);
 
@@ -259,8 +311,8 @@ export default class KokoroTtsPlugin extends Plugin {
       }
     } finally {
       this.isSynthesizing = false;
-      await this.cache.clearTempSynthesisFolder(notePath);
-      await this.cache.writeManifest(notePath, this.buildManifest(notePath, prepared.text, this.sentences));
+      await this.cache.clearTempSynthesisFolder(notePath, backend);
+      await this.cache.writeManifest(notePath, backend, this.buildManifest(notePath, prepared.text, this.sentences));
     }
 
     new Notice(`Synthesis complete: ${readyCount} ready, ${failedCount} failed`);
@@ -332,13 +384,13 @@ export default class KokoroTtsPlugin extends Plugin {
 
     if (playbackState === "playing") {
       this.playback.pause();
-      new Notice("Paused Kokoro TTS playback");
+      new Notice("Paused local TTS playback");
       return;
     }
 
     if (playbackState === "paused") {
       await this.playback.resume();
-      new Notice("Resumed Kokoro TTS playback");
+      new Notice("Resumed local TTS playback");
       return;
     }
 
@@ -507,7 +559,8 @@ export default class KokoroTtsPlugin extends Plugin {
       return -1;
     }
 
-    let cached = await this.cache.listExistingSentenceAudio(notePath);
+    const backend = this.settings.backend;
+    let cached = await this.cache.listExistingSentenceAudio(notePath, backend);
     if (cached.files.length === 0) {
       new Notice("No cached synthesis found. Run 'Synthesize active note' first.");
       return -1;
@@ -518,8 +571,14 @@ export default class KokoroTtsPlugin extends Plugin {
     if (shouldResynthesizeFromValidation(validation, split.length)) {
       const staleDisplayIndex = (validation.firstStaleSentenceIndex ?? 0) + 1;
       new Notice(`The note changed from sentence ${staleDisplayIndex} onward. Re-synthesizing outdated audio...`);
-      await this.resynthesizeInvalidSentences(notePath, currentNoteText, split, validation.firstStaleSentenceIndex ?? 0);
-      cached = await this.cache.listExistingSentenceAudio(notePath);
+      await this.resynthesizeInvalidSentences(
+        notePath,
+        backend,
+        currentNoteText,
+        split,
+        validation.firstStaleSentenceIndex ?? 0,
+      );
+      cached = await this.cache.listExistingSentenceAudio(notePath, backend);
       validation = validateCacheAgainstCurrentSentences(currentNoteText, split, cached.manifest);
     } else if (validation.noteHashOnlyMismatch) {
       console.info("[KokoroTTS] Note-level hash changed but sentence hashes still match; skipping re-synthesis.");
@@ -569,17 +628,18 @@ export default class KokoroTtsPlugin extends Plugin {
 
   private async resynthesizeInvalidSentences(
     notePath: string,
+    backend: PluginSettings["backend"],
     currentNoteText: string,
     split: SentenceChunk[],
     staleFromIndex: number,
   ): Promise<void> {
     if (!this.client) {
-      new Notice("Kokoro client is not initialized");
+      new Notice("Local TTS client is not initialized");
       return;
     }
 
-    await this.cache.prepareNoteSynthesisFolder(notePath, false);
-    const tempOutputDir = await this.cache.prepareTempSynthesisFolder(notePath, true);
+    await this.cache.prepareNoteSynthesisFolder(notePath, backend, false);
+    const tempOutputDir = await this.cache.prepareTempSynthesisFolder(notePath, backend, true);
     const sessionId = `note-resynth-${Date.now()}`;
     let regeneratedCount = 0;
     let failedCount = 0;
@@ -590,8 +650,9 @@ export default class KokoroTtsPlugin extends Plugin {
         const { response: result } = await this.client.synthesizeSentence({
           sessionId,
           sentenceId: sentence.id,
+          backend,
           text: sentence.spokenText ?? sentence.text,
-          voice: this.settings.voice,
+          voice: this.getActiveBackendVoice(),
           speed: this.settings.speed,
           outputDir: tempOutputDir,
         });
@@ -603,16 +664,16 @@ export default class KokoroTtsPlugin extends Plugin {
           continue;
         }
 
-        const persistentAudioPath = this.cache.getSentenceAudioAbsolutePath(notePath, sentence.id);
+        const persistentAudioPath = this.cache.getSentenceAudioAbsolutePath(notePath, backend, sentence.id);
         await fs.mkdir(dirname(persistentAudioPath), { recursive: true });
         await fs.copyFile(result.audioPath, persistentAudioPath);
         regeneratedCount += 1;
       }
     } finally {
-      await this.cache.clearTempSynthesisFolder(notePath);
+      await this.cache.clearTempSynthesisFolder(notePath, backend);
     }
 
-    await this.cache.writeManifest(notePath, this.buildManifest(notePath, currentNoteText, split));
+    await this.cache.writeManifest(notePath, backend, this.buildManifest(notePath, currentNoteText, split));
 
     if (failedCount > 0) {
       new Notice(`Re-synthesized ${regeneratedCount} sentences, but ${failedCount} failed.`);

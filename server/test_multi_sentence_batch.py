@@ -47,6 +47,7 @@ def main() -> int:
         payload = {
             "sessionId": session_id,
             "sentenceId": idx,
+            "backend": "kokoro",
             "text": sentence,
             "voice": "af_sarah",
             "speed": 1.0,
