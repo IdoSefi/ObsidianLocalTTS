@@ -173,9 +173,10 @@ export default class KokoroTtsPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    const loaded = Object.assign({}, DEFAULT_SETTINGS, await this.loadData()) as PluginSettings & { voice?: string };
-    if (loaded.voice && !loaded.kokoroVoice) {
-      loaded.kokoroVoice = loaded.voice;
+    const raw = (await this.loadData()) as Partial<PluginSettings> & { voice?: string } | null;
+    const loaded = Object.assign({}, DEFAULT_SETTINGS, raw) as PluginSettings & { voice?: string };
+    if (raw?.voice && !raw.kokoroVoice) {
+      loaded.kokoroVoice = raw.voice;
     }
     loaded.backend = loaded.backend === "piper" ? "piper" : "kokoro";
     loaded.kokoroVoice = loaded.kokoroVoice?.trim() || DEFAULT_SETTINGS.kokoroVoice;
@@ -709,7 +710,7 @@ export default class KokoroTtsPlugin extends Plugin {
 
   private getVoiceForBackend(backend: TtsBackend): string {
     if (backend === "piper") {
-      return "en_US-lessac-high";
+      return this.settings.piperVoice || "en_US-lessac-high";
     }
     return this.settings.kokoroVoice;
   }

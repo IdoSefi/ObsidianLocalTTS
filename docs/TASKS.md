@@ -57,3 +57,4 @@
 | T-048 | Add command-palette backend switching commands | DONE | agent | T-047 | Added `Use Kokoro TTS backend` and `Use Piper TTS backend` commands with persisted settings + Notice confirmation |
 | T-049 | Generalize synth contract and cache identity for backend-aware synthesis | DONE | agent | T-047,T-048 | `/synthesize` request now includes `backend`; cache/staging folders are backend-specific to prevent Kokoro/Piper collisions |
 | T-050 | Extend local server `/synthesize` to support Piper (`en_US-lessac-high`) alongside Kokoro | DONE | agent | T-049 | Added backend dispatch with subprocess-based Piper path, fixed-voice enforcement, and clear runtime/model-missing errors |
+| T-051 | Fix legacy voice migration so existing Kokoro voice setting is preserved after backend-settings rollout | DONE | agent | T-047 | `loadSettings()` now checks raw persisted data and maps legacy `voice` -> `kokoroVoice` only when legacy-only data is present |
