@@ -214,6 +214,6 @@ export class StatusView {
   }
 
   private setText(text: string): void {
-    this.textEl.textContent = `Kokoro TTS: ${text}`;
+    this.textEl.textContent = `Local TTS: ${text}`;
   }
 }

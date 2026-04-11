@@ -1,21 +1,26 @@
 from __future__ import annotations
 
+import os
+import shutil
+import subprocess
+import wave
 from pathlib import Path
 from tempfile import gettempdir
-from typing import Optional
+from typing import Literal, Optional
 
-from fastapi import FastAPI
-from pydantic import BaseModel, Field
 import numpy as np
-import wave
-
+from fastapi import FastAPI
 from kokoro import KPipeline
+from pydantic import BaseModel, Field
 
-APP_NAME = "obsidian-kokoro-tts-server"
+APP_NAME = "obsidian-local-tts-server"
 CACHE_ROOT = Path(gettempdir()) / APP_NAME
 CACHE_ROOT.mkdir(parents=True, exist_ok=True)
 
 MEAN_ABS_NEAR_SILENT_THRESHOLD = 1e-5
+SUPPORTED_PIPER_VOICE = "en_US-lessac-high"
+PIPER_MODEL_ENV = "PIPER_EN_US_LESSAC_HIGH_MODEL"
+PIPER_BINARY_ENV = "PIPER_BIN"
 
 app = FastAPI(title=APP_NAME)
 _pipeline_cache: dict[str, KPipeline] = {}
@@ -28,6 +33,7 @@ class AudioValidationError(ValueError):
 class SynthesisRequest(BaseModel):
     sessionId: str = Field(..., min_length=1)
     sentenceId: int = Field(..., ge=0)
+    backend: Literal["kokoro", "piper"] = "kokoro"
     text: str = Field(..., min_length=1)
     voice: str = Field(..., min_length=1)
     speed: float = Field(..., gt=0)
@@ -62,27 +68,36 @@ def synthesize(payload: SynthesisRequest) -> SynthesisResponse:
     output_path = session_dir / f"sentence-{payload.sentenceId:04d}.wav"
 
     try:
-        pipeline = get_pipeline_for_voice(payload.voice)
-        audio = synthesize_kokoro_audio(
-            pipeline=pipeline,
-            text=payload.text,
-            voice=payload.voice,
-            speed=payload.speed,
-        )
-        write_wav_from_float_audio(output_path, audio=audio)
+        if payload.backend == "kokoro":
+            pipeline = get_pipeline_for_voice(payload.voice)
+            audio = synthesize_kokoro_audio(
+                pipeline=pipeline,
+                text=payload.text,
+                voice=payload.voice,
+                speed=payload.speed,
+            )
+            write_wav_from_float_audio(output_path, audio=audio)
+        else:
+            synthesize_piper_audio(
+                text=payload.text,
+                voice=payload.voice,
+                speed=payload.speed,
+                output_path=output_path,
+            )
+            validate_existing_wav(output_path)
     except AudioValidationError as exc:
         return SynthesisResponse(
             sessionId=payload.sessionId,
             sentenceId=payload.sentenceId,
             ok=False,
-            error=f"Kokoro synthesis failed: {exc}",
+            error=f"{payload.backend.title()} synthesis failed: {exc}",
         )
     except Exception as exc:
         return SynthesisResponse(
             sessionId=payload.sessionId,
             sentenceId=payload.sentenceId,
             ok=False,
-            error=f"Kokoro synthesis failed: unexpected server error ({exc})",
+            error=f"{payload.backend.title()} synthesis failed: unexpected server error ({exc})",
         )
 
     return SynthesisResponse(
@@ -165,6 +180,75 @@ def write_wav_from_float_audio(path: Path, audio: np.ndarray, sample_rate: int =
         wav_file.setsampwidth(2)
         wav_file.setframerate(sample_rate)
         wav_file.writeframes(pcm16.tobytes())
+
+
+def synthesize_piper_audio(text: str, voice: str, speed: float, output_path: Path) -> None:
+    if voice != SUPPORTED_PIPER_VOICE:
+        raise AudioValidationError(
+            f"unsupported Piper voice '{voice}'. Only '{SUPPORTED_PIPER_VOICE}' is supported"
+        )
+
+    piper_bin = os.getenv(PIPER_BINARY_ENV, "piper")
+    resolved_bin = shutil.which(piper_bin)
+    if resolved_bin is None:
+        raise AudioValidationError(
+            f"Piper runtime not found. Install Piper and ensure '{piper_bin}' is on PATH"
+        )
+
+    model_path_str = os.getenv(PIPER_MODEL_ENV)
+    if not model_path_str:
+        raise AudioValidationError(
+            f"Piper model path is not configured. Set {PIPER_MODEL_ENV} to the '{SUPPORTED_PIPER_VOICE}' .onnx path"
+        )
+
+    model_path = Path(model_path_str).expanduser().resolve()
+    if not model_path.exists():
+        raise AudioValidationError(f"Configured Piper model does not exist: {model_path}")
+
+    length_scale = max(0.05, min(4.0, 1.0 / speed))
+
+    command = [
+        resolved_bin,
+        "--model",
+        str(model_path),
+        "--output_file",
+        str(output_path),
+        "--length_scale",
+        f"{length_scale:.4f}",
+    ]
+
+    try:
+        subprocess.run(
+            command,
+            input=text,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or "").strip()
+        raise AudioValidationError(f"piper command failed: {stderr or exc}") from exc
+
+
+def validate_existing_wav(path: Path) -> None:
+    if not path.exists() or path.stat().st_size <= 44:
+        raise AudioValidationError("synthesized WAV file is missing or empty")
+
+    with wave.open(str(path), "rb") as wav_file:
+        frame_count = wav_file.getnframes()
+        if frame_count <= 0:
+            raise AudioValidationError("synthesized WAV has zero frames")
+
+        frames = wav_file.readframes(frame_count)
+        if not frames:
+            raise AudioValidationError("synthesized WAV has no frame data")
+
+        samples = np.frombuffer(frames, dtype=np.int16).astype(np.float32)
+        if samples.size == 0:
+            raise AudioValidationError("synthesized WAV has no decodable samples")
+
+        normalized = samples / np.float32(np.iinfo(np.int16).max)
+        _validate_final_audio(normalized)
 
 
 if __name__ == "__main__":

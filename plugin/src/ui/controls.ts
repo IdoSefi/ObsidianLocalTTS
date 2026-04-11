@@ -14,7 +14,7 @@ export function registerUiControls(plugin: KokoroTtsPlugin): void {
 
   const stopIcon = plugin.addRibbonIcon("square", "Stop playback", () => {
     plugin.stopPlayback();
-    new Notice("Stopped Kokoro TTS playback");
+    new Notice("Stopped local TTS playback");
   });
   setIcon(stopIcon, "square");
 }
