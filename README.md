@@ -1,17 +1,20 @@
-# Obsidian Kokoro TTS Plugin
+# Obsidian Local TTS Plugin
 
-Personal-use Obsidian desktop plugin for local text-to-speech with sentence-level playback using Kokoro-82M.
+Personal-use Obsidian desktop plugin for local text-to-speech with sentence-level playback using local backends.
 
-## v1.1 scope
+## v1.3 scope
 - Reading view only
-- Localhost Kokoro server
+- Localhost server with two local backends:
+  - Kokoro (default)
+  - Piper (`en_US-lessac-high`)
 - One cached WAV per sentence
-- Persistent per-note cache under vault `audio_synthesis/`
+- Persistent per-note, per-backend cache under vault `audio_synthesis/`
 - Click a word to restart from that sentence
 - Distinct **Synthesize** vs **Play cached** flows
 - Pause/resume/stop
 - Playback can start while synthesis is still ongoing
 - Visible synthesis + playback status UI (Notices + status bar + seek slider + play/stop buttons)
+- Command-palette backend switching (`Use Kokoro TTS backend`, `Use Piper TTS backend`)
 
 ## Synthesize vs Play behavior
 - **Synthesize active note**
@@ -31,7 +34,7 @@ For each note, synthesis is stored inside your vault:
 - `audio_synthesis/<note-folder>/sentence-0002.wav`
 - ...
 
-`<note-folder>` is a Windows-safe folder name derived from the note path plus a short hash so notes with the same filename in different folders do not collide.
+`<note-folder>` is a Windows-safe folder name derived from the note path plus a short hash, and now also includes the backend suffix (`-kokoro` or `-piper`) so same-note caches do not collide across backends.
 
 During synthesis, the plugin may use a system-temp staging folder for server compatibility, then copies each completed WAV into this vault cache location.
 
@@ -47,7 +50,7 @@ During synthesis, the plugin may use a system-temp staging folder for server com
 1. Open the repo in Codex.
 2. Start with `prompts/CODEX_PROJECT_PROMPT.md`.
 3. Let Codex work in small steps and keep the tracker files updated.
-4. Develop the Obsidian plugin inside `plugin/` and the local Kokoro server inside `server/`.
+4. Develop the Obsidian plugin inside `plugin/` and the local TTS server inside `server/`.
 
 ## Manual local setup target
 ### Plugin
@@ -60,7 +63,7 @@ During synthesis, the plugin may use a system-temp staging folder for server com
 
 ## Local run guide
 
-### 1) Run the FastAPI Kokoro server
+### 1) Run the FastAPI local TTS server
 From the repo root:
 
 ```bash
@@ -71,6 +74,14 @@ python server/app.py
 ```
 
 The server listens on `http://127.0.0.1:8765` and exposes `GET /health` and `POST /synthesize`.
+
+`/synthesize` now accepts `backend: "kokoro" | "piper"` in the request body.
+
+Piper requirements for backend switching:
+- Install `piper` CLI so `piper` is available on PATH.
+- Download `en_US-lessac-high.onnx` and either:
+  - set `PIPER_MODEL_PATH=/absolute/path/to/en_US-lessac-high.onnx`, or
+  - place it at `server/models/piper/en_US-lessac-high.onnx`.
 
 ### 2) Run the standalone synth test script
 With the server running:
@@ -104,6 +115,6 @@ npm install
 npm run build
 ```
 
-Then copy/symlink `plugin/` into your vault under `.obsidian/plugins/obsidian-kokoro-tts/`, enable the plugin in Obsidian, keep server URL set to `http://127.0.0.1:8765`, switch to Reading view, and run **Synthesize active note**.
+Then copy/symlink `plugin/` into your vault under `.obsidian/plugins/obsidian-kokoro-tts/`, enable the plugin in Obsidian, keep server URL set to `http://127.0.0.1:8765`, switch to Reading view, pick backend from command palette (`Use Kokoro TTS backend` or `Use Piper TTS backend`), and run **Synthesize active note**.
 
 During synthesis/playback, watch the Obsidian status bar for `Kokoro TTS` state (Idle, Synthesizing X/Y, Playing/Paused sentence X/Y, Stopped/Failed). The slider shows current sentence progress and supports seeking within the active sentence, and the play/stop buttons appear next to the slider for quick controls.

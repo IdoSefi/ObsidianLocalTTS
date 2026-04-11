@@ -27,14 +27,19 @@ export interface NoteSynthesisManifest {
 
 export interface PluginSettings {
   serverUrl: string;
-  voice: string;
+  backend: TtsBackend;
+  kokoroVoice: string;
+  piperVoice: string;
   speed: number;
 }
+
+export type TtsBackend = "kokoro" | "piper";
 
 export interface SynthesisRequest {
   sessionId: string;
   sentenceId: number;
   text: string;
+  backend: TtsBackend;
   voice: string;
   speed: number;
   outputDir: string;

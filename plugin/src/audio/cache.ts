@@ -2,12 +2,12 @@ import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, extname, join } from "node:path";
 import { App, FileSystemAdapter, normalizePath } from "obsidian";
-import type { CachedSentenceAudio, NoteSynthesisManifest } from "../types";
+import type { CachedSentenceAudio, NoteSynthesisManifest, TtsBackend } from "../types";
 
 const ROOT_FOLDER = "audio_synthesis";
 const MANIFEST_FILE = "manifest.json";
 const SENTENCE_FILE_REGEX = /^sentence-(\d+)\.wav$/i;
-const STAGING_ROOT = join(tmpdir(), "obsidian-kokoro-tts-staging");
+const STAGING_ROOT = join(tmpdir(), "obsidian-local-tts-staging");
 
 export interface PrepareNoteFolderResult {
   noteFolderPath: string;
@@ -23,18 +23,19 @@ export interface ExistingSentenceAudioResult {
 export class VaultAudioCache {
   constructor(private readonly app: App) {}
 
-  getNoteSynthesisFolder(notePath: string): string {
-    const safeFolderName = this.getSafeNoteFolderName(notePath);
+  getNoteSynthesisFolder(notePath: string, backend: TtsBackend): string {
+    const safeFolderName = this.getSafeNoteFolderName(notePath, backend);
     return normalizePath(`${ROOT_FOLDER}/${safeFolderName}`);
   }
 
   async prepareNoteSynthesisFolder(
     notePath: string,
+    backend: TtsBackend,
     replaceExisting: boolean,
   ): Promise<PrepareNoteFolderResult> {
     await this.ensureFolderExists(ROOT_FOLDER);
 
-    const noteFolderPath = this.getNoteSynthesisFolder(notePath);
+    const noteFolderPath = this.getNoteSynthesisFolder(notePath, backend);
     if (replaceExisting && (await this.app.vault.adapter.exists(noteFolderPath))) {
       await this.app.vault.adapter.rmdir(noteFolderPath, true);
     }
@@ -46,8 +47,8 @@ export class VaultAudioCache {
     };
   }
 
-  async prepareTempSynthesisFolder(notePath: string, replaceExisting: boolean): Promise<string> {
-    const tempFolder = this.getTempSynthesisFolder(notePath);
+  async prepareTempSynthesisFolder(notePath: string, backend: TtsBackend, replaceExisting: boolean): Promise<string> {
+    const tempFolder = this.getTempSynthesisFolder(notePath, backend);
     if (replaceExisting) {
       await fs.rm(tempFolder, { recursive: true, force: true });
     }
@@ -55,26 +56,26 @@ export class VaultAudioCache {
     return tempFolder;
   }
 
-  async clearTempSynthesisFolder(notePath: string): Promise<void> {
-    await fs.rm(this.getTempSynthesisFolder(notePath), { recursive: true, force: true });
+  async clearTempSynthesisFolder(notePath: string, backend: TtsBackend): Promise<void> {
+    await fs.rm(this.getTempSynthesisFolder(notePath, backend), { recursive: true, force: true });
   }
 
-  getSentenceAudioVaultPath(notePath: string, sentenceId: number): string {
-    const noteFolder = this.getNoteSynthesisFolder(notePath);
+  getSentenceAudioVaultPath(notePath: string, backend: TtsBackend, sentenceId: number): string {
+    const noteFolder = this.getNoteSynthesisFolder(notePath, backend);
     const oneBased = sentenceId + 1;
     return normalizePath(`${noteFolder}/sentence-${String(oneBased).padStart(4, "0")}.wav`);
   }
 
-  getSentenceAudioAbsolutePath(notePath: string, sentenceId: number): string {
-    return this.getAbsolutePathForVaultPath(this.getSentenceAudioVaultPath(notePath, sentenceId));
+  getSentenceAudioAbsolutePath(notePath: string, backend: TtsBackend, sentenceId: number): string {
+    return this.getAbsolutePathForVaultPath(this.getSentenceAudioVaultPath(notePath, backend, sentenceId));
   }
 
   getAbsolutePathForVaultPath(vaultPath: string): string {
     return this.toAbsolutePath(vaultPath);
   }
 
-  async listExistingSentenceAudio(notePath: string): Promise<ExistingSentenceAudioResult> {
-    const noteFolderPath = this.getNoteSynthesisFolder(notePath);
+  async listExistingSentenceAudio(notePath: string, backend: TtsBackend): Promise<ExistingSentenceAudioResult> {
+    const noteFolderPath = this.getNoteSynthesisFolder(notePath, backend);
     const exists = await this.app.vault.adapter.exists(noteFolderPath);
     if (!exists) {
       return {
@@ -105,7 +106,7 @@ export class VaultAudioCache {
       .filter((file): file is CachedSentenceAudio => file !== null)
       .sort((a, b) => a.sentenceId - b.sentenceId);
 
-    const manifest = await this.readManifest(notePath);
+    const manifest = await this.readManifest(notePath, backend);
 
     return {
       noteFolderPath,
@@ -114,21 +115,21 @@ export class VaultAudioCache {
     };
   }
 
-  async clearNoteSynthesis(notePath: string): Promise<void> {
-    const folder = this.getNoteSynthesisFolder(notePath);
+  async clearNoteSynthesis(notePath: string, backend: TtsBackend): Promise<void> {
+    const folder = this.getNoteSynthesisFolder(notePath, backend);
     if (!(await this.app.vault.adapter.exists(folder))) {
       return;
     }
     await this.app.vault.adapter.rmdir(folder, true);
   }
 
-  async writeManifest(notePath: string, manifest: NoteSynthesisManifest): Promise<void> {
-    const manifestPath = normalizePath(`${this.getNoteSynthesisFolder(notePath)}/${MANIFEST_FILE}`);
+  async writeManifest(notePath: string, backend: TtsBackend, manifest: NoteSynthesisManifest): Promise<void> {
+    const manifestPath = normalizePath(`${this.getNoteSynthesisFolder(notePath, backend)}/${MANIFEST_FILE}`);
     await this.app.vault.adapter.write(manifestPath, JSON.stringify(manifest, null, 2));
   }
 
-  async readManifest(notePath: string): Promise<NoteSynthesisManifest | null> {
-    const manifestPath = normalizePath(`${this.getNoteSynthesisFolder(notePath)}/${MANIFEST_FILE}`);
+  async readManifest(notePath: string, backend: TtsBackend): Promise<NoteSynthesisManifest | null> {
+    const manifestPath = normalizePath(`${this.getNoteSynthesisFolder(notePath, backend)}/${MANIFEST_FILE}`);
     if (!(await this.app.vault.adapter.exists(manifestPath))) {
       return null;
     }
@@ -141,8 +142,8 @@ export class VaultAudioCache {
     }
   }
 
-  private getTempSynthesisFolder(notePath: string): string {
-    return join(STAGING_ROOT, this.getSafeNoteFolderName(notePath));
+  private getTempSynthesisFolder(notePath: string, backend: TtsBackend): string {
+    return join(STAGING_ROOT, this.getSafeNoteFolderName(notePath, backend));
   }
 
   private async ensureFolderExists(folder: string): Promise<void> {
@@ -152,12 +153,12 @@ export class VaultAudioCache {
     await this.app.vault.adapter.mkdir(folder);
   }
 
-  private getSafeNoteFolderName(notePath: string): string {
+  private getSafeNoteFolderName(notePath: string, backend: TtsBackend): string {
     const normalizedPath = normalizePath(notePath);
     const filename = basename(normalizedPath, extname(normalizedPath)) || "note";
     const sanitizedBase = sanitizeForWindows(filename).slice(0, 40) || "note";
     const hash = hashString(normalizedPath);
-    return `${sanitizedBase}-${hash}`;
+    return `${sanitizedBase}-${hash}-${backend}`;
   }
 
   private toAbsolutePath(vaultPath: string): string {
