@@ -8,14 +8,14 @@
 
 | ID | Feature | Status | Description | Notes |
 |---|---|---|---|---|
-| F-001 | Synthesize active note | COMPLETE | Generate TTS for the current note only | Reading + Source mode synth command/ribbon implemented |
+| F-001 | On-demand active-note synthesis | COMPLETE | Generate TTS for the current note automatically when playback needs missing/outdated audio | Triggered by Play and Source-mode restart flows; explicit synth button/command removed |
 | F-002 | Sentence-level audio cache | COMPLETE | One WAV per sentence persisted in vault | Stored under `audio_synthesis/<windows-safe-note-key>/` |
 | F-003 | Sequential playback | COMPLETE | Play sentence files in note order | Auto-advance on audio end; skips failures |
 | F-004 | Pause/resume | COMPLETE | Pause and continue current playback | Command + ribbon support |
 | F-005 | Stop playback | COMPLETE | Stop current playback and reset state | Command + ribbon support |
 | F-006 | Click word to restart sentence | DEFERRED | In Reading view, clicking a word restarts from that sentence | Disabled to simplify behavior; Source mode context-menu restart is supported |
-| F-007 | Play active note from cache | COMPLETE | Replay current note without regeneration | New command: `Play active note from cached synthesis` |
-| F-008 | Explicit regenerate behavior | COMPLETE | Synthesize command replaces old per-note audio | Note folder is recreated before synth run |
+| F-007 | Play active note with cache-or-synthesize behavior | COMPLETE | Play uses valid cached audio when available and auto-synthesizes missing/outdated audio when needed | Command renamed to `Play active note` |
+| F-008 | Start-index-aware suffix synthesis | COMPLETE | Playback preparation can synthesize only the required suffix from a requested sentence index | Source-mode `Start reading from here` synthesizes from target sentence onward without forcing earlier sentences |
 | F-009 | Auto-start while generating | COMPLETE | Playback starts once first ready sentence exists | Later sentences can still be generating |
 | F-010 | Wait-for-ready playback progression | COMPLETE | If next sentence is not ready yet, playback waits/polls briefly | Simple 250ms polling while synthesis is active |
 | F-011 | Partial-failure resilience | COMPLETE | Keep/play already-ready sentence audio even when some synthesis requests fail | End-of-run notice summarizes ready vs failed counts |
@@ -44,3 +44,8 @@
 | F-033 | Latest-command-wins command supersession and synthesis cancellation | COMPLETE | Plugin orchestration now uses command/synthesis run tokens so only the newest user action survives async waits; stale continuations exit quietly | Stop now acts as global cancel (playback + synthesis continuation + pending waits/UI continuations) and avoids delayed stale state updates |
 | F-034 | Command supersession without synthesis interruption | COMPLETE | Newer playback/navigation commands supersede older command continuations without canceling the active synthesis loop | Synthesis continues until completion or explicit Stop, allowing restart/jump commands to wait for pending sentence audio |
 | F-035 | Pending-state preservation on cache reload during synthesis | COMPLETE | When cache is reloaded mid-synthesis (for play/restart flows), unsynthesized sentences retain generating/pending state instead of being forced to error | Enables Source-mode restart on later sentences to wait for synthesis rather than failing immediately |
+| F-036 | Per-run staging isolation + unusable-WAV auto-repair | COMPLETE | Each synthesis run now uses its own temp staging folder, and playback prep treats missing/non-WAV sentence files as stale so they are regenerated automatically | Prevents run-overrun temp-path races and helps recover from bad sentence files without manual cache clearing |
+| F-037 | First-play cache-miss notice correctness | COMPLETE | New notes without any cache/manifest are now treated as cache-miss (missing audio) instead of hash-stale cache | Avoids misleading “outdated sentence hashes” messaging on first play of uncached notes |
+| F-038 | Windows-safe cached sentence filename parsing | COMPLETE | Cache file discovery now normalizes `\\` to `/` before extracting sentence filenames | Prevents false cache misses when vault adapter paths include Windows separators |
+| F-039 | Runtime sentence-state synchronization during suffix synthesis | COMPLETE | Suffix synthesis now mirrors per-sentence generating/error/ready transitions and resolved audio paths into the active playback sentence array | Prevents autoplay/restart attempting to play stale `this.sentences` entries that still lack `audioPath` |
+| F-040 | User-confirmed recovery after sentence playback/synthesis failure | COMPLETE | When a sentence cannot be played (or synthesis leaves failures), plugin asks whether to re-synthesize from the affected sentence onward | Keeps recovery explicit and user-controlled instead of forcing automatic retries |

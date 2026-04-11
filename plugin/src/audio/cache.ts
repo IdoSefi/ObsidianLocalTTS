@@ -51,18 +51,14 @@ export class VaultAudioCache {
   async prepareTempSynthesisFolder(
     notePath: string,
     backend: PluginSettings["backend"],
-    replaceExisting: boolean,
   ): Promise<string> {
-    const tempFolder = this.getTempSynthesisFolder(notePath, backend);
-    if (replaceExisting) {
-      await fs.rm(tempFolder, { recursive: true, force: true });
-    }
-    await fs.mkdir(tempFolder, { recursive: true });
-    return tempFolder;
+    const tempRoot = join(STAGING_ROOT, this.getSafeNoteFolderName(notePath, backend));
+    await fs.mkdir(tempRoot, { recursive: true });
+    return fs.mkdtemp(join(tempRoot, "run-"));
   }
 
-  async clearTempSynthesisFolder(notePath: string, backend: PluginSettings["backend"]): Promise<void> {
-    await fs.rm(this.getTempSynthesisFolder(notePath, backend), { recursive: true, force: true });
+  async clearTempSynthesisFolder(tempFolder: string): Promise<void> {
+    await fs.rm(tempFolder, { recursive: true, force: true });
   }
 
   getSentenceAudioVaultPath(notePath: string, backend: PluginSettings["backend"], sentenceId: number): string {
@@ -100,7 +96,7 @@ export class VaultAudioCache {
     const listResult = await this.app.vault.adapter.list(noteFolderPath);
     const files: CachedSentenceAudio[] = listResult.files
       .map((vaultPath) => {
-        const filename = vaultPath.split("/").pop() ?? "";
+        const filename = vaultPath.replace(/\\/g, "/").split("/").pop() ?? "";
         const match = filename.match(SENTENCE_FILE_REGEX);
         if (!match) {
           return null;
@@ -156,10 +152,6 @@ export class VaultAudioCache {
     } catch {
       return null;
     }
-  }
-
-  private getTempSynthesisFolder(notePath: string, backend: PluginSettings["backend"]): string {
-    return join(STAGING_ROOT, this.getSafeNoteFolderName(notePath, backend));
   }
 
   private async ensureFolderExists(folder: string): Promise<void> {
