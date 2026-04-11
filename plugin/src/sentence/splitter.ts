@@ -1,15 +1,18 @@
 import type { SentenceChunk } from "../types";
+import { maskPathDotsForSentenceSplit } from "./pathMasking";
 
 const SENTENCE_REGEX = /[^.!?]+[.!?]+|[^.!?]+$/g;
 
 export function splitIntoSentences(text: string): SentenceChunk[] {
   const chunks: SentenceChunk[] = [];
-  const matches = text.matchAll(SENTENCE_REGEX);
+  const maskedText = maskPathDotsForSentenceSplit(text);
+  const matches = maskedText.matchAll(SENTENCE_REGEX);
   let id = 0;
 
   for (const match of matches) {
-    const raw = match[0];
+    const rawMasked = match[0];
     const start = match.index ?? 0;
+    const raw = text.slice(start, start + rawMasked.length);
     const trimmed = raw.trim();
     if (!trimmed) {
       continue;

@@ -5,6 +5,7 @@ import { VaultAudioCache } from "./audio/cache";
 import { KokoroClient } from "./audio/kokoroClient";
 import { PlaybackController } from "./audio/playback";
 import { DEFAULT_SETTINGS, KokoroTtsSettingTab } from "./settings";
+import { normalizeSentenceForSpeech } from "./sentence/normalize";
 import { findSentenceByOffset, splitIntoSentences } from "./sentence/splitter";
 import type { NoteSynthesisManifest, PluginSettings, SentenceChunk } from "./types";
 import { registerUiControls } from "./ui/controls";
@@ -175,7 +176,7 @@ export default class KokoroTtsPlugin extends Plugin {
       return;
     }
 
-    this.sentences = splitIntoSentences(prepared.text);
+    this.sentences = this.withSpokenText(splitIntoSentences(prepared.text));
     this.sentencesNotePath = prepared.notePath;
     if (this.sentences.length === 0) {
       new Notice("No readable sentences found in the active note");
@@ -225,7 +226,7 @@ export default class KokoroTtsPlugin extends Plugin {
         const { response: result } = await this.client.synthesizeSentence({
           sessionId,
           sentenceId: sentence.id,
-          text: sentence.text,
+          text: sentence.spokenText ?? sentence.text,
           voice: this.settings.voice,
           speed: this.settings.speed,
           outputDir: tempOutputDir,
@@ -284,7 +285,7 @@ export default class KokoroTtsPlugin extends Plugin {
     }
 
     const notePath = prepared.notePath;
-    const split = splitIntoSentences(prepared.text);
+    const split = this.withSpokenText(splitIntoSentences(prepared.text));
     const firstReadyIndex = await this.loadSentencesFromCache(notePath, prepared.text, split);
     if (firstReadyIndex < 0) {
       return;
@@ -415,7 +416,7 @@ export default class KokoroTtsPlugin extends Plugin {
       return;
     }
 
-    const split = splitIntoSentences(prepared.text);
+    const split = this.withSpokenText(splitIntoSentences(prepared.text));
     const sentence = findSentenceByOffset(split, prepared.offset);
     if (!sentence) {
       return;
@@ -430,6 +431,13 @@ export default class KokoroTtsPlugin extends Plugin {
     if (started) {
       new Notice(`Restarted from sentence ${sentence.id + 1}`);
     }
+  }
+
+  private withSpokenText(sentences: SentenceChunk[]): SentenceChunk[] {
+    return sentences.map((sentence) => ({
+      ...sentence,
+      spokenText: normalizeSentenceForSpeech(sentence.text),
+    }));
   }
 
   private getPreparedActiveNote(
@@ -582,7 +590,7 @@ export default class KokoroTtsPlugin extends Plugin {
         const { response: result } = await this.client.synthesizeSentence({
           sessionId,
           sentenceId: sentence.id,
-          text: sentence.text,
+          text: sentence.spokenText ?? sentence.text,
           voice: this.settings.voice,
           speed: this.settings.speed,
           outputDir: tempOutputDir,

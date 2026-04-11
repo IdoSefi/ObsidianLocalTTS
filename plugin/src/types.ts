@@ -3,6 +3,7 @@ export type AudioState = "idle" | "generating" | "ready" | "error";
 export interface SentenceChunk {
   id: number;
   text: string;
+  spokenText?: string;
   from: number;
   to: number;
   audioPath?: string;
