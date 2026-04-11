@@ -638,12 +638,28 @@ export default class KokoroTtsPlugin extends Plugin {
 
     const filesBySentence = new Map(cached.files.map((item) => [item.sentenceId, item.audioPath]));
     const validPrefixCount = validation.validSentenceCount;
+    const previousSentenceStateById = new Map(this.sentences.map((sentence) => [sentence.id, sentence]));
+    const keepPendingSynthesisState = this.isSynthesizing && this.sentencesNotePath === notePath;
 
     this.sentences = split.map((sentence) => {
       const audioPath = filesBySentence.get(sentence.id);
       const isSentenceWithinValidPrefix = sentence.id < validPrefixCount;
       const isPlayable = isSentenceWithinValidPrefix && Boolean(audioPath);
       if (!isPlayable) {
+        if (keepPendingSynthesisState) {
+          const previous = previousSentenceStateById.get(sentence.id);
+          if (previous && previous.audioState !== "error") {
+            return {
+              ...sentence,
+              audioPath: previous.audioPath,
+              audioState: previous.audioState,
+            };
+          }
+          return {
+            ...sentence,
+            audioState: "generating" as const,
+          };
+        }
         return {
           ...sentence,
           audioState: "error" as const,
