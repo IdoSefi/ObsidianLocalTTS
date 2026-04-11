@@ -474,7 +474,13 @@ export default class KokoroTtsPlugin extends Plugin {
     }
 
     const filesBySentence = new Map(cached.files.map((item) => [item.sentenceId, item.audioPath]));
-    const staleFromIndex = findFirstStaleSentenceFromIndex(currentNoteText, split, cached.manifest, startIndex);
+    const staleFromIndex = findFirstStaleSentenceFromIndex(
+      currentNoteText,
+      split,
+      cached.manifest,
+      startIndex,
+      cached.files.length,
+    );
     const firstUnusableAudioIndex = findFirstUnusableAudioFromIndex(split, filesBySentence, startIndex);
     const synthFromIndex = minNonNull(staleFromIndex, firstUnusableAudioIndex);
 
@@ -745,9 +751,10 @@ function findFirstStaleSentenceFromIndex(
   currentSentences: SentenceChunk[],
   manifest: NoteSynthesisManifest | null,
   startIndex: number,
+  cachedFileCount: number,
 ): number | null {
   if (!manifest) {
-    return startIndex;
+    return cachedFileCount > 0 ? startIndex : null;
   }
 
   const currentSentenceHashes = currentSentences.map((sentence) => hashSentenceText(sentence.text));
