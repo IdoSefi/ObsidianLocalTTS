@@ -96,7 +96,7 @@ export class VaultAudioCache {
     const listResult = await this.app.vault.adapter.list(noteFolderPath);
     const files: CachedSentenceAudio[] = listResult.files
       .map((vaultPath) => {
-        const filename = vaultPath.split("/").pop() ?? "";
+        const filename = vaultPath.replace(/\\/g, "/").split("/").pop() ?? "";
         const match = filename.match(SENTENCE_FILE_REGEX);
         if (!match) {
           return null;
