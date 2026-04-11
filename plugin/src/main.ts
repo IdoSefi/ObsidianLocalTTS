@@ -593,6 +593,10 @@ export default class KokoroTtsPlugin extends Plugin {
       for (let idx = synthFromIndex; idx < split.length; idx += 1) {
         const sentence = split[idx];
         sentence.audioState = "generating";
+        const runtimeSentence = this.sentences[sentence.id];
+        if (runtimeSentence) {
+          runtimeSentence.audioState = "generating";
+        }
         this.statusView?.setSynthesizing(idx - synthFromIndex + 1, totalWork);
         const { response: result } = await this.client.synthesizeSentence({
           sessionId,
@@ -609,6 +613,9 @@ export default class KokoroTtsPlugin extends Plugin {
 
         if (!result.ok || !result.audioPath) {
           sentence.audioState = "error";
+          if (runtimeSentence) {
+            runtimeSentence.audioState = "error";
+          }
           failedCount += 1;
           const reason = result.error ?? "unknown error";
           console.error(`[KokoroTTS] Re-synthesis failed for sentence ${sentence.id + 1}: ${reason}`);
@@ -623,6 +630,10 @@ export default class KokoroTtsPlugin extends Plugin {
         }
         sentence.audioPath = persistentAudioPath;
         sentence.audioState = "ready";
+        if (runtimeSentence) {
+          runtimeSentence.audioPath = persistentAudioPath;
+          runtimeSentence.audioState = "ready";
+        }
         regeneratedCount += 1;
 
         if (!playbackStarted && sentence.id === autoplayStartIndex) {
