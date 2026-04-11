@@ -9,7 +9,7 @@ Personal-use Obsidian desktop plugin for local text-to-speech with sentence-leve
   - Kokoro (default)
   - Piper (`en_US-lessac-high`)
 - One cached WAV per sentence
-- Persistent per-note cache under vault `audio_synthesis/`
+- Persistent per-note cache under vault `.audio_synthesis/`
 - Click a word to restart from that sentence
 - Distinct **Synthesize** vs **Play cached** flows
 - Pause/resume/stop
@@ -36,9 +36,9 @@ Personal-use Obsidian desktop plugin for local text-to-speech with sentence-leve
 ## Vault cache layout
 For each note and backend, synthesis is stored inside your vault:
 
-- `audio_synthesis/<note-folder>/manifest.json`
-- `audio_synthesis/<note-folder>/sentence-0001.wav`
-- `audio_synthesis/<note-folder>/sentence-0002.wav`
+- `.audio_synthesis/<note-folder>/manifest.json`
+- `.audio_synthesis/<note-folder>/sentence-0001.wav`
+- `.audio_synthesis/<note-folder>/sentence-0002.wav`
 - ...
 
 `<note-folder>` is a Windows-safe folder name derived from the note path, backend, and a short hash so notes with the same filename in different folders (or different backends) do not collide.

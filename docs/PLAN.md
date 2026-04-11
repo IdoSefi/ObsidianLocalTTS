@@ -31,7 +31,7 @@ Build a personal-use Obsidian desktop plugin that:
   - `kokoroVoice` (preserved when backend switches)
   - `piperVoice` fixed to `en_US-lessac-high` in v1.3 scope
 - Pause, resume, stop
-- Persistent per-note cache under vault `audio_synthesis/`
+- Persistent per-note cache under vault `.audio_synthesis/`
 - Distinct actions for **Synthesize active note** (always regenerate) and **Play active note** (reuse cache)
 - Playback waiting for not-yet-ready sentences during active synthesis (simple polling)
 - Backend-aware cache identity to avoid Kokoro/Piper collisions for the same note
@@ -60,7 +60,7 @@ Build a personal-use Obsidian desktop plugin that:
   - generation state
 - Track active backend and resolve backend-specific request voice
 - Request audio generation from local TTS server
-- Store/reload note synthesis from vault `audio_synthesis/<note-key>/`
+- Store/reload note synthesis from vault `.audio_synthesis/<note-key>/`
 - Persist lightweight per-note synthesis manifest
 - Register Source mode editor context-menu hooks
 - Map editor cursor offset to sentence
@@ -81,11 +81,11 @@ Build a personal-use Obsidian desktop plugin that:
 - Plugin language: TypeScript
 - Server language: Python
 - Audio format: WAV for simplicity
-- Cache location: vault-managed folder `audio_synthesis/`
+- Cache location: vault-managed folder `.audio_synthesis/`
 - Server compatibility write path: system-temp staging folder per note, then copy to vault cache
 - Note cache layout:
-  - `audio_synthesis/<windows-safe-note-key>/sentence-0001.wav`
-  - `audio_synthesis/<windows-safe-note-key>/manifest.json`
+  - `.audio_synthesis/<windows-safe-note-key>/sentence-0001.wav`
+  - `.audio_synthesis/<windows-safe-note-key>/manifest.json`
 - Note key strategy:
   - derive from vault-relative note path
   - sanitize invalid Windows filename characters

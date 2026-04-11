@@ -5,7 +5,7 @@ import type { PluginSettings } from "./types";
 export const DEFAULT_SETTINGS: PluginSettings = {
   serverUrl: "http://127.0.0.1:8765",
   backend: "kokoro",
-  kokoroVoice: "af_heart",
+  kokoroVoice: "af_bella",
   piperVoice: "en_US-lessac-high",
   speed: 1.0,
 };

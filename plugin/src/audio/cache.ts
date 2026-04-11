@@ -5,7 +5,7 @@ import { App, FileSystemAdapter, normalizePath } from "obsidian";
 import type { CachedSentenceAudio, NoteSynthesisManifest } from "../types";
 import type { PluginSettings } from "../types";
 
-const ROOT_FOLDER = "audio_synthesis";
+const ROOT_FOLDER = ".audio_synthesis";
 const MANIFEST_FILE = "manifest.json";
 const SENTENCE_FILE_REGEX = /^sentence-(\d+)\.wav$/i;
 const STAGING_ROOT = join(tmpdir(), "obsidian-kokoro-tts-staging");
