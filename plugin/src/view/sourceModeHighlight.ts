@@ -1,6 +1,6 @@
 import { StateEffect, StateField } from "@codemirror/state";
-import { Decoration, type DecorationSet, EditorView } from "@codemirror/view";
-import { MarkdownView } from "obsidian";
+import { Decoration, type DecorationSet, EditorView, ViewPlugin } from "@codemirror/view";
+import { editorInfoField } from "obsidian";
 
 const setPlaybackHighlightEffect = StateEffect.define<{ from: number; to: number }>();
 const clearPlaybackHighlightEffect = StateEffect.define<null>();
@@ -35,8 +35,6 @@ const sourcePlaybackHighlightField = StateField.define<DecorationSet>({
   },
 });
 
-export const sourcePlaybackHighlightExtension = [sourcePlaybackHighlightField];
-
 export function setSourcePlaybackHighlight(view: EditorView, from: number, to: number): void {
   view.dispatch({
     effects: setPlaybackHighlightEffect.of({ from, to }),
@@ -49,20 +47,46 @@ export function clearSourcePlaybackHighlight(view: EditorView): void {
   });
 }
 
-type MaybeCodeMirrorEditor = {
-  cm?: EditorView;
-  cmEditor?: EditorView;
-  editor?: {
-    cm?: EditorView;
-    cmEditor?: EditorView;
-  };
-};
+const trackedSourceEditorViews = new Set<EditorView>();
 
-export function getSourceModeEditorView(markdownView: MarkdownView): EditorView | null {
-  if (markdownView.getMode() !== "source") {
-    return null;
+const sourceEditorTrackingPlugin = ViewPlugin.fromClass(
+  class {
+    constructor(private readonly view: EditorView) {
+      trackedSourceEditorViews.add(view);
+    }
+
+    destroy(): void {
+      trackedSourceEditorViews.delete(this.view);
+    }
+  },
+);
+
+export const sourcePlaybackHighlightExtension = [sourcePlaybackHighlightField, sourceEditorTrackingPlugin];
+
+function getEditorNotePath(view: EditorView): string | null {
+  const info = view.state.field(editorInfoField, false);
+  return info?.file?.path ?? null;
+}
+
+function editorHasFocus(view: EditorView): boolean {
+  const activeElement = view.dom.ownerDocument.activeElement;
+  return activeElement !== null && view.dom.contains(activeElement);
+}
+
+export function getTrackedSourceEditorViewForNote(notePath: string): EditorView | null {
+  let fallback: EditorView | null = null;
+
+  for (const view of trackedSourceEditorViews) {
+    if (getEditorNotePath(view) !== notePath) {
+      continue;
+    }
+
+    if (editorHasFocus(view)) {
+      return view;
+    }
+
+    fallback ??= view;
   }
 
-  const editor = markdownView.editor as unknown as MaybeCodeMirrorEditor;
-  return editor.cm ?? editor.cmEditor ?? editor.editor?.cm ?? editor.editor?.cmEditor ?? null;
+  return fallback;
 }

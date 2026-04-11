@@ -11,7 +11,7 @@ import { registerUiControls } from "./ui/controls";
 import { StatusView } from "./ui/status";
 import {
   clearSourcePlaybackHighlight,
-  getSourceModeEditorView,
+  getTrackedSourceEditorViewForNote,
   setSourcePlaybackHighlight,
   sourcePlaybackHighlightExtension,
 } from "./view/sourceModeHighlight";
@@ -33,7 +33,7 @@ export default class KokoroTtsPlugin extends Plugin {
   private sentencesNotePath: string | null = null;
   private isSynthesizing = false;
   private statusView: StatusView | null = null;
-  private highlightedSourceView: MarkdownView | null = null;
+  private highlightedSourceView: ReturnType<typeof getTrackedSourceEditorViewForNote> | null = null;
   private lastArrowKey: "ArrowLeft" | "ArrowRight" | null = null;
   private lastArrowKeyTs = 0;
   private readonly arrowDoublePressWindowMs = 300;
@@ -633,7 +633,7 @@ export default class KokoroTtsPlugin extends Plugin {
       return;
     }
 
-    const sourceEditorView = getSourceModeEditorView(activeMarkdownView);
+    const sourceEditorView = getTrackedSourceEditorViewForNote(activeNotePath);
     if (!sourceEditorView) {
       this.clearSourcePlaybackHighlightInTrackedView();
       return;
@@ -645,12 +645,12 @@ export default class KokoroTtsPlugin extends Plugin {
       return;
     }
 
-    if (this.highlightedSourceView && this.highlightedSourceView !== activeMarkdownView) {
+    if (this.highlightedSourceView && this.highlightedSourceView !== sourceEditorView) {
       this.clearSourcePlaybackHighlightInTrackedView();
     }
 
     setSourcePlaybackHighlight(sourceEditorView, sentence.from, sentence.to);
-    this.highlightedSourceView = activeMarkdownView;
+    this.highlightedSourceView = sourceEditorView;
   }
 
   private clearSourcePlaybackHighlightInTrackedView(): void {
@@ -658,10 +658,7 @@ export default class KokoroTtsPlugin extends Plugin {
       return;
     }
 
-    const sourceEditorView = getSourceModeEditorView(this.highlightedSourceView);
-    if (sourceEditorView) {
-      clearSourcePlaybackHighlight(sourceEditorView);
-    }
+    clearSourcePlaybackHighlight(this.highlightedSourceView);
 
     this.highlightedSourceView = null;
   }
