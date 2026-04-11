@@ -68,55 +68,47 @@ During synthesis, the plugin may use a system-temp staging folder for server com
 - Run locally on the same machine as Obsidian
 - Provide a small HTTP API for sentence synthesis
 
-## Local run guide
+## Local install + initialization (recommended order)
 
-### 1) Run the FastAPI local TTS server
-From the repo root:
+### 1) Start the local TTS server
+Create/activate a Python environment and install server deps:
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate   # Windows PowerShell: .venv\Scripts\Activate.ps1
 pip install -r server/requirements.txt
+```
+
+Run the server:
+
+```bash
 python server/app.py
 ```
 
-The server listens on `http://127.0.0.1:8765` and exposes `GET /health` and `POST /synthesize`.
+Server URL is `http://127.0.0.1:8765` (`/health` + `/synthesize`).
 
-For Piper backend support, configure:
+### 2) Configure Piper (only if you want Piper backend)
+You must have:
+- a runnable Piper binary
+- `en_US-lessac-high.onnx` on disk
+
+Set environment variables in the shell used to launch `server/app.py`:
 
 ```bash
 export PIPER_EN_US_LESSAC_HIGH_MODEL=/absolute/path/to/en_US-lessac-high.onnx
-# optional if binary name/path differs from "piper"
 export PIPER_BIN=piper
 ```
 
-If Piper runtime or model is missing, `/synthesize` returns a clear error that surfaces in Obsidian.
+Windows PowerShell:
 
-### 2) Run the standalone synth test script
-With the server running:
-
-```bash
-python server/test_synthesize_request.py
+```powershell
+$env:PIPER_EN_US_LESSAC_HIGH_MODEL="C:\piper\en_US-lessac-high.onnx"
+$env:PIPER_BIN="C:\path\to\piper.exe"
 ```
 
-This script prints the request payload, response JSON, WAV path/size, WAV header metadata, PCM amplitude stats, and fails if the output appears effectively silent.
+If Piper runtime/model is missing, synthesis returns a clear error.
 
-Direct Kokoro (no HTTP) diagnostic:
-
-```bash
-python server/debug_kokoro_direct.py
-```
-
-This script runs `KPipeline` directly with `af_heart`, prints per-chunk/final waveform stats (shape, dtype, min/max, mean absolute amplitude, finite/zero checks), writes `kokoro-direct-debug.wav` under your OS temp directory, and exits non-zero if it detects no chunks, all-zero, non-finite, or near-silent audio.
-
-Optional multi-sentence test:
-
-```bash
-python server/test_multi_sentence_batch.py
-```
-
-### 3) Run the plugin against the local server
-Build the plugin:
+### 3) Build and install the Obsidian plugin
 
 ```bash
 cd plugin
@@ -124,6 +116,21 @@ npm install
 npm run build
 ```
 
-Then copy/symlink `plugin/` into your vault under `.obsidian/plugins/obsidian-kokoro-tts/`, enable the plugin in Obsidian, keep server URL set to `http://127.0.0.1:8765`, choose a backend from command palette, switch to Reading view, and run **Synthesize active note**.
+Copy (or symlink) the full `plugin/` folder into your vault as:
 
-During synthesis/playback, watch the Obsidian status bar for `Kokoro TTS` state (Idle, Synthesizing X/Y, Playing/Paused sentence X/Y, Stopped/Failed). The slider shows current sentence progress and supports seeking within the active sentence, and the play/stop buttons appear next to the slider for quick controls.
+`.obsidian/plugins/obsidian-kokoro-tts/`
+
+Then in Obsidian:
+1. Enable the plugin.
+2. Open plugin settings and confirm server URL (`http://127.0.0.1:8765`).
+3. Use command palette (`Ctrl+P`) to choose backend:
+   - `Use Kokoro TTS backend` (default voice `af_bella`)
+   - `Use Piper TTS backend`
+4. Run `Synthesize active note`.
+
+### 4) Optional sanity checks
+
+```bash
+python server/test_synthesize_request.py
+python server/test_multi_sentence_batch.py
+```
