@@ -20,6 +20,7 @@ export interface PlaybackStateEvent {
 export interface PlaybackControllerCallbacks {
   onProgress?: (event: PlaybackProgressEvent) => void;
   onStateChange?: (event: PlaybackStateEvent) => void;
+  onWaitingForSentence?: (event: { sentenceIndex: number; totalSentences: number }) => void;
 }
 
 interface AudioListeners {
@@ -95,8 +96,16 @@ export class PlaybackController {
 
     const sentence = await this.waitForSentence(index, runId, allowWaitingForPendingSentence);
     if (!sentence) {
+      const targetSentence = this.sentences[index];
+      const isPendingWhileWaitingAllowed =
+        allowWaitingForPendingSentence &&
+        targetSentence !== undefined &&
+        targetSentence.audioState !== "ready" &&
+        targetSentence.audioState !== "error";
       if (runId === this.playbackRunId) {
-        this.emitState("failed", "Audio file is missing or not ready for the selected sentence");
+        if (!isPendingWhileWaitingAllowed) {
+          this.emitState("failed", "Audio file is missing or not ready for the selected sentence");
+        }
       }
       return false;
     }
@@ -167,6 +176,8 @@ export class PlaybackController {
     runId: number,
     allowWaiting: boolean,
   ): Promise<SentenceChunk | null> {
+    let waitingNotified = false;
+
     while (true) {
       if (runId !== this.playbackRunId) {
         return null;
@@ -192,6 +203,14 @@ export class PlaybackController {
 
       if (!shouldWait) {
         return null;
+      }
+
+      if (!waitingNotified) {
+        this.callbacks.onWaitingForSentence?.({
+          sentenceIndex,
+          totalSentences: this.sentences.length,
+        });
+        waitingNotified = true;
       }
 
       await sleep(250);

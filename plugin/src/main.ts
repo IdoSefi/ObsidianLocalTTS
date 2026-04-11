@@ -9,6 +9,12 @@ import { findSentenceByOffset, splitIntoSentences } from "./sentence/splitter";
 import type { NoteSynthesisManifest, PluginSettings, SentenceChunk } from "./types";
 import { registerUiControls } from "./ui/controls";
 import { StatusView } from "./ui/status";
+import {
+  clearSourcePlaybackHighlight,
+  getTrackedSourceEditorViewForNote,
+  setSourcePlaybackHighlight,
+  sourcePlaybackHighlightExtension,
+} from "./view/sourceModeHighlight";
 import { registerSourceModeHooks } from "./view/sourceModeHooks";
 
 interface CacheValidationResult {
@@ -27,6 +33,7 @@ export default class KokoroTtsPlugin extends Plugin {
   private sentencesNotePath: string | null = null;
   private isSynthesizing = false;
   private statusView: StatusView | null = null;
+  private highlightedSourceView: ReturnType<typeof getTrackedSourceEditorViewForNote> | null = null;
   private lastArrowKey: "ArrowLeft" | "ArrowRight" | null = null;
   private lastArrowKeyTs = 0;
   private readonly arrowDoublePressWindowMs = 300;
@@ -62,8 +69,12 @@ export default class KokoroTtsPlugin extends Plugin {
       onProgress: ({ currentTime, duration }) => {
         this.statusView?.setProgress(currentTime, duration);
       },
+      onWaitingForSentence: ({ sentenceIndex, totalSentences }) => {
+        new Notice(`Waiting for sentence ${sentenceIndex + 1}/${totalSentences} to finish synthesizing...`);
+      },
       onStateChange: ({ state, sentenceIndex, totalSentences, message }) => {
         const oneBasedIndex = sentenceIndex + 1;
+        this.syncSourceModePlaybackHighlight(state, sentenceIndex);
         if (state === "playing") {
           this.statusView?.setPlaying(oneBasedIndex, totalSentences);
           return;
@@ -85,6 +96,16 @@ export default class KokoroTtsPlugin extends Plugin {
     this.registerDomEvent(document, "keydown", (event: KeyboardEvent) => {
       void this.handleArrowDoublePress(event);
     });
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", () => {
+        this.syncSourceModePlaybackHighlight();
+      }),
+    );
+    this.registerEvent(
+      this.app.workspace.on("file-open", () => {
+        this.syncSourceModePlaybackHighlight();
+      }),
+    );
 
     this.playback.setWaitForSentenceReadyHandler((sentenceIndex, sentence) => {
       if (!this.isSynthesizing) {
@@ -94,6 +115,7 @@ export default class KokoroTtsPlugin extends Plugin {
     });
 
     this.addSettingTab(new KokoroTtsSettingTab(this.app, this));
+    this.registerEditorExtension(sourcePlaybackHighlightExtension);
     registerUiControls(this);
     registerSourceModeHooks(this);
 
@@ -287,6 +309,12 @@ export default class KokoroTtsPlugin extends Plugin {
 
     const started = await this.playback.playFromSentence(index, allowWaitForReady);
     if (!started) {
+      const isPendingWhileSynthesizing =
+        allowWaitForReady && this.isSynthesizing && sentence.audioState !== "ready" && sentence.audioState !== "error";
+      if (isPendingWhileSynthesizing) {
+        console.info(`[KokoroTTS] Waiting for sentence ${index + 1} audio to become ready...`);
+        return false;
+      }
       const audioPath = sentence.audioPath ?? "unknown path";
       const message = `Could not start playback for sentence ${index + 1}`;
       console.error(`[KokoroTTS] ${message}. Audio path: ${audioPath}`);
@@ -341,6 +369,7 @@ export default class KokoroTtsPlugin extends Plugin {
   stopPlayback(): void {
     this.playback.stop();
     this.isSynthesizing = false;
+    this.clearSourcePlaybackHighlightInTrackedView();
   }
 
   private isSentenceMovementAllowed(): boolean {
@@ -583,6 +612,64 @@ export default class KokoroTtsPlugin extends Plugin {
     }
 
     new Notice(`Re-synthesized ${regeneratedCount} updated sentence${regeneratedCount === 1 ? "" : "s"}.`);
+  }
+
+  private syncSourceModePlaybackHighlight(
+    explicitState?: "idle" | "playing" | "paused" | "stopped" | "failed",
+    explicitSentenceIndex?: number,
+  ): void {
+    const playbackState = explicitState ?? this.playback.getState();
+    if (playbackState === "idle" || playbackState === "stopped" || playbackState === "failed") {
+      this.clearSourcePlaybackHighlightInTrackedView();
+      return;
+    }
+
+    const sentenceIndex = explicitSentenceIndex ?? this.playback.getCurrentIndex();
+    if (sentenceIndex < 0 || sentenceIndex >= this.sentences.length) {
+      this.clearSourcePlaybackHighlightInTrackedView();
+      return;
+    }
+
+    const activeMarkdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const activeNotePath = activeMarkdownView?.file?.path ?? null;
+    if (
+      !activeMarkdownView ||
+      activeMarkdownView.getMode() !== "source" ||
+      !this.sentencesNotePath ||
+      activeNotePath !== this.sentencesNotePath
+    ) {
+      this.clearSourcePlaybackHighlightInTrackedView();
+      return;
+    }
+
+    const sourceEditorView = getTrackedSourceEditorViewForNote(activeNotePath);
+    if (!sourceEditorView) {
+      this.clearSourcePlaybackHighlightInTrackedView();
+      return;
+    }
+
+    const sentence = this.sentences[sentenceIndex];
+    if (!sentence) {
+      this.clearSourcePlaybackHighlightInTrackedView();
+      return;
+    }
+
+    if (this.highlightedSourceView && this.highlightedSourceView !== sourceEditorView) {
+      this.clearSourcePlaybackHighlightInTrackedView();
+    }
+
+    setSourcePlaybackHighlight(sourceEditorView, sentence.from, sentence.to);
+    this.highlightedSourceView = sourceEditorView;
+  }
+
+  private clearSourcePlaybackHighlightInTrackedView(): void {
+    if (!this.highlightedSourceView) {
+      return;
+    }
+
+    clearSourcePlaybackHighlight(this.highlightedSourceView);
+
+    this.highlightedSourceView = null;
   }
 }
 
