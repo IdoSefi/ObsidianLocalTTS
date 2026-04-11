@@ -258,6 +258,7 @@ export default class KokoroTtsPlugin extends Plugin {
       console.error(`[KokoroTTS] ${message}. Audio path: ${audioPath}`);
       this.statusView?.setFailed(message);
       new Notice(`${message}. Check console for details.`);
+      void this.promptResynthesizeAfterFailure(index);
       return false;
     }
 
@@ -384,6 +385,36 @@ export default class KokoroTtsPlugin extends Plugin {
     if (started && this.isCommandRunCurrent(runId)) {
       new Notice(`Restarted from sentence ${sentence.id + 1}`);
     }
+  }
+
+  private async promptResynthesizeAfterFailure(sentenceIndex: number): Promise<void> {
+    const shouldResynthesize = window.confirm(
+      `Sentence ${sentenceIndex + 1} could not be played. Resynthesize from this sentence onward?`,
+    );
+    if (!shouldResynthesize) {
+      return;
+    }
+
+    const runId = this.beginCommandRun();
+    const prepared = this.getPreparedActiveNote();
+    if (!prepared || !this.isCommandRunCurrent(runId)) {
+      return;
+    }
+
+    const split = this.withSpokenText(splitIntoSentences(prepared.text));
+    const clampedSentenceIndex = Math.min(Math.max(sentenceIndex, 0), Math.max(split.length - 1, 0));
+    const isReady = await this.ensureSentencesReadyForPlayback(
+      prepared.notePath,
+      prepared.text,
+      split,
+      clampedSentenceIndex,
+      runId,
+    );
+    if (!isReady || !this.isCommandRunCurrent(runId)) {
+      return;
+    }
+
+    await this.playFromSentence(clampedSentenceIndex, true, runId);
   }
 
   private withSpokenText(sentences: SentenceChunk[]): SentenceChunk[] {
@@ -587,6 +618,7 @@ export default class KokoroTtsPlugin extends Plugin {
     const sessionId = `note-resynth-${Date.now()}`;
     let regeneratedCount = 0;
     let failedCount = 0;
+    let firstFailedSentenceId: number | null = null;
     let playbackStarted = false;
 
     try {
@@ -617,6 +649,7 @@ export default class KokoroTtsPlugin extends Plugin {
             runtimeSentence.audioState = "error";
           }
           failedCount += 1;
+          firstFailedSentenceId ??= sentence.id;
           const reason = result.error ?? "unknown error";
           console.error(`[KokoroTTS] Re-synthesis failed for sentence ${sentence.id + 1}: ${reason}`);
           continue;
@@ -658,6 +691,9 @@ export default class KokoroTtsPlugin extends Plugin {
 
     if (failedCount > 0) {
       new Notice(`Re-synthesized ${regeneratedCount} sentences, but ${failedCount} failed.`);
+      if (firstFailedSentenceId !== null) {
+        void this.promptResynthesizeAfterFailure(firstFailedSentenceId);
+      }
       return playbackStarted;
     }
 
