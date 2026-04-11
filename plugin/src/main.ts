@@ -252,27 +252,15 @@ export default class KokoroTtsPlugin extends Plugin {
     const notePath = prepared.notePath;
     const backend = this.settings.backend;
     await this.cache.prepareNoteSynthesisFolder(notePath, backend, true);
-    if (!this.isCommandRunCurrent(runId)) {
-      return;
-    }
     const tempOutputDir = await this.cache.prepareTempSynthesisFolder(notePath, backend, true);
-    if (!this.isCommandRunCurrent(runId)) {
-      return;
-    }
     const sessionId = `note-${Date.now()}`;
 
     await this.cache.writeManifest(notePath, backend, this.buildManifest(notePath, prepared.text, this.sentences));
-    if (!this.isCommandRunCurrent(runId)) {
-      return;
-    }
 
     new Notice(`Starting synthesis for ${total} sentences`);
     this.statusView?.setSynthesizing(0, total);
 
     const health = await this.client.healthcheck();
-    if (!this.isCommandRunCurrent(runId)) {
-      return;
-    }
     if (!health.ok) {
       const healthMessage = health.error ?? (health.status ? `HTTP ${health.status}` : "unknown error");
       this.statusView?.setFailed("Health check failed");
@@ -301,7 +289,7 @@ export default class KokoroTtsPlugin extends Plugin {
           speed: this.settings.speed,
           outputDir: tempOutputDir,
         });
-        if (!this.isCommandRunCurrent(runId) || !this.isSynthesisRunCurrent(synthesisRunId)) {
+        if (!this.isSynthesisRunCurrent(synthesisRunId)) {
           return;
         }
 
@@ -316,7 +304,7 @@ export default class KokoroTtsPlugin extends Plugin {
         const persistentAudioPath = this.cache.getSentenceAudioAbsolutePath(notePath, backend, sentence.id);
         await fs.mkdir(dirname(persistentAudioPath), { recursive: true });
         await fs.copyFile(result.audioPath, persistentAudioPath);
-        if (!this.isCommandRunCurrent(runId) || !this.isSynthesisRunCurrent(synthesisRunId)) {
+        if (!this.isSynthesisRunCurrent(synthesisRunId)) {
           return;
         }
 
@@ -326,7 +314,7 @@ export default class KokoroTtsPlugin extends Plugin {
 
         if (!playbackStarted) {
           playbackStarted = await this.playFromSentence(sentence.id, true, runId);
-          if (!this.isCommandRunCurrent(runId) || !this.isSynthesisRunCurrent(synthesisRunId)) {
+          if (!this.isSynthesisRunCurrent(synthesisRunId)) {
             return;
           }
           if (playbackStarted && sentence.id > 0) {
@@ -341,12 +329,12 @@ export default class KokoroTtsPlugin extends Plugin {
         this.isSynthesizing = false;
       }
       await this.cache.clearTempSynthesisFolder(notePath, backend);
-      if (this.isCommandRunCurrent(runId) && this.isSynthesisRunCurrent(synthesisRunId)) {
+      if (this.isSynthesisRunCurrent(synthesisRunId)) {
         await this.cache.writeManifest(notePath, backend, this.buildManifest(notePath, prepared.text, this.sentences));
       }
     }
 
-    if (!this.isCommandRunCurrent(runId) || !this.isSynthesisRunCurrent(synthesisRunId)) {
+    if (!this.isSynthesisRunCurrent(synthesisRunId)) {
       return;
     }
 
@@ -367,7 +355,6 @@ export default class KokoroTtsPlugin extends Plugin {
 
   async playActiveNoteFromCache(): Promise<void> {
     const runId = this.beginCommandRun();
-    this.cancelPlaybackAndSynthesis(false);
     const prepared = this.getPreparedActiveNote();
     if (!prepared || !this.isCommandRunCurrent(runId)) {
       return;
@@ -517,7 +504,6 @@ export default class KokoroTtsPlugin extends Plugin {
 
   async restartPlaybackFromSourceCursor(): Promise<void> {
     const runId = this.beginCommandRun();
-    this.cancelPlaybackAndSynthesis(false);
     const prepared = this.getPreparedActiveNote("source");
     if (!prepared || !this.isCommandRunCurrent(runId)) {
       return;
