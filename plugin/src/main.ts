@@ -1,4 +1,4 @@
-import { promises as fs } from "node:fs";
+import { existsSync, promises as fs, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { MarkdownView, Notice, Plugin } from "obsidian";
 import { VaultAudioCache } from "./audio/cache";
@@ -475,8 +475,8 @@ export default class KokoroTtsPlugin extends Plugin {
 
     const filesBySentence = new Map(cached.files.map((item) => [item.sentenceId, item.audioPath]));
     const staleFromIndex = findFirstStaleSentenceFromIndex(currentNoteText, split, cached.manifest, startIndex);
-    const firstMissingAudioIndex = findFirstMissingAudioFromIndex(split, filesBySentence, startIndex);
-    const synthFromIndex = minNonNull(staleFromIndex, firstMissingAudioIndex);
+    const firstUnusableAudioIndex = findFirstUnusableAudioFromIndex(split, filesBySentence, startIndex);
+    const synthFromIndex = minNonNull(staleFromIndex, firstUnusableAudioIndex);
 
     const validPrefixCount = staleFromIndex ?? split.length;
     const previousSentenceStateById = new Map(this.sentences.map((sentence) => [sentence.id, sentence]));
@@ -524,7 +524,7 @@ export default class KokoroTtsPlugin extends Plugin {
       await this.playFromSentence(startIndex, true, runId);
     }
 
-    const reason = staleFromIndex !== null ? "outdated sentence hashes" : "missing sentence audio";
+    const reason = staleFromIndex !== null ? "outdated sentence hashes" : "missing or invalid sentence audio";
     new Notice(`Preparing note audio from sentence ${synthFromIndex + 1} onward (${reason}).`);
     const playbackStarted = await this.synthesizeSentencesFromIndex(
       notePath,
@@ -563,7 +563,7 @@ export default class KokoroTtsPlugin extends Plugin {
     }
 
     await this.cache.prepareNoteSynthesisFolder(notePath, backend, false);
-    const tempOutputDir = await this.cache.prepareTempSynthesisFolder(notePath, backend, true);
+    const tempOutputDir = await this.cache.prepareTempSynthesisFolder(notePath, backend);
     if (runId !== undefined && !this.isCommandRunCurrent(runId)) {
       return false;
     }
@@ -630,7 +630,7 @@ export default class KokoroTtsPlugin extends Plugin {
       if (this.isSynthesisRunCurrent(synthesisRunId)) {
         this.isSynthesizing = false;
       }
-      await this.cache.clearTempSynthesisFolder(notePath, backend);
+      await this.cache.clearTempSynthesisFolder(tempOutputDir);
     }
 
     if ((runId !== undefined && !this.isCommandRunCurrent(runId)) || !this.isSynthesisRunCurrent(synthesisRunId)) {
@@ -772,18 +772,37 @@ function findFirstStaleSentenceFromIndex(
   return null;
 }
 
-function findFirstMissingAudioFromIndex(
+function findFirstUnusableAudioFromIndex(
   sentences: SentenceChunk[],
   filesBySentence: Map<number, string>,
   startIndex: number,
 ): number | null {
   for (let index = startIndex; index < sentences.length; index += 1) {
-    if (!filesBySentence.get(index)) {
+    const audioPath = filesBySentence.get(index);
+    if (!audioPath || !isLikelyPlayableWav(audioPath)) {
       return index;
     }
   }
 
   return null;
+}
+
+function isLikelyPlayableWav(audioPath: string): boolean {
+  if (!existsSync(audioPath)) {
+    return false;
+  }
+
+  try {
+    const header = readFileSync(audioPath).subarray(0, 12);
+    if (header.length < 12) {
+      return false;
+    }
+    const riff = header.subarray(0, 4).toString("ascii");
+    const wave = header.subarray(8, 12).toString("ascii");
+    return riff === "RIFF" && wave === "WAVE";
+  } catch {
+    return false;
+  }
 }
 
 function minNonNull(left: number | null, right: number | null): number | null {
