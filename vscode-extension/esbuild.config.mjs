@@ -1,0 +1,15 @@
+import esbuild from 'esbuild';
+
+const production = process.argv.includes('production');
+
+await esbuild.build({
+  entryPoints: ['src/extension.ts'],
+  bundle: true,
+  outfile: 'dist/extension.js',
+  platform: 'node',
+  format: 'cjs',
+  target: 'node18',
+  sourcemap: !production,
+  minify: production,
+  external: ['vscode'],
+});
