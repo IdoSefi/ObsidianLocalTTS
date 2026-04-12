@@ -8,7 +8,7 @@
       "args": [
         "/d",
         "/c",
-        "npm.cmd rebuild esbuild && npm.cmd run build"
+        "npm.cmd install --include=optional --no-audit --no-fund && npm.cmd run build"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
