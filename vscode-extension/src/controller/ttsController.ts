@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { LocalTtsClient } from '../audio/localTtsClient';
@@ -116,26 +117,33 @@ export class TtsController {
     const client = this.clientFor();
     const voice = getActiveVoice(settings);
     const sessionId = randomUUID();
+    const tempDir = await this.cache.createTempSynthesisDir(filePath, settings.backend);
 
     await client.health();
 
-    for (const sentence of sentences) {
-      const response = await client.synthesize({
-        sessionId,
-        sentenceId: sentence.id,
-        backend: settings.backend,
-        text: sentence.text,
-        voice,
-        speed: settings.speed,
-        outputDir: folder,
-      });
+    try {
+      for (const sentence of sentences) {
+        const response = await client.synthesize({
+          sessionId,
+          sentenceId: sentence.id,
+          backend: settings.backend,
+          text: sentence.text,
+          voice,
+          speed: settings.speed,
+          outputDir: tempDir,
+        });
 
-      if (!response.ok || !response.audioPath) {
-        throw new Error(response.error ?? `Synthesis failed for sentence ${sentence.id + 1}`);
+        if (!response.ok || !response.audioPath) {
+          throw new Error(response.error ?? `Synthesis failed for sentence ${sentence.id + 1}`);
+        }
+
+        await fs.copyFile(response.audioPath, this.cache.sentenceWavPath(folder, sentence.id));
       }
-    }
 
-    await this.cache.writeManifest(folder, buildManifest(filePath, settings.backend, sentences, text));
+      await this.cache.writeManifest(folder, buildManifest(filePath, settings.backend, sentences, text));
+    } finally {
+      await this.cache.removeTempSynthesisDir(tempDir);
+    }
   }
 
   private async playSentences(folder: string, sentences: SentenceChunk[], startId: number): Promise<void> {

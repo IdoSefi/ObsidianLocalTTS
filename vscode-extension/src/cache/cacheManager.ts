@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { CacheManifest, SentenceChunk, TtsBackend } from '../types';
@@ -31,6 +32,18 @@ export class CacheManager {
     return { key, folder };
   }
 
+
+
+  async createTempSynthesisDir(filePath: string, backend: TtsBackend): Promise<string> {
+    const key = getFileKey(filePath, backend);
+    const root = path.join(os.tmpdir(), 'local-tts-vscode', key);
+    await fs.mkdir(root, { recursive: true });
+    return fs.mkdtemp(path.join(root, 'run-'));
+  }
+
+  async removeTempSynthesisDir(tempDir: string): Promise<void> {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
   sentenceWavPath(folder: string, sentenceId: number): string {
     return path.join(folder, `sentence-${String(sentenceId + 1).padStart(4, '0')}.wav`);
   }

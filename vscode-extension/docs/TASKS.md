@@ -18,3 +18,4 @@
 | VSC-011 | Avoid PowerShell `npm.ps1` execution-policy failure on F5 prelaunch build | DONE | Added `.vscode/tasks.json` with `npm.cmd run build` and wired launch preLaunchTask to `build-extension` |
 | VSC-012 | Auto-heal common mixed-platform esbuild installs on Windows F5 build | DONE | Updated `build-extension` task to run `npm.cmd rebuild esbuild` before build to recover from Linux/Windows binary mismatch |
 | VSC-013 | Ensure optional esbuild platform package is installed during F5 prelaunch build | DONE | Updated build task to run `npm.cmd install --include=optional` before build and added project `.npmrc` (`include=optional`) |
+| VSC-014 | Route synthesis output through system temp staging and copy WAVs into extension cache | DONE | Fixes server `outputDir must be under system temp` restriction while keeping persistent extension storage cache |

@@ -18,3 +18,4 @@
 | VF-010 | Windows-safe F5 prelaunch build task | COMPLETE | Added `build-extension` task that uses `npm.cmd` so extension launch works when PowerShell script execution is restricted |
 | VF-011 | Mixed-platform esbuild recovery in F5 build task | COMPLETE | Windows launch task now rebuilds esbuild binary before build to handle WSL/Windows `node_modules` crossover cases |
 | VF-012 | Optional-dependency-safe Windows prelaunch build | COMPLETE | Prelaunch build now ensures optional deps are installed (`include=optional`) to prevent missing `@esbuild/win32-x64` errors |
+| VF-013 | Temp-staging bridge for server outputDir constraint | COMPLETE | Synthesis now targets per-run system-temp folder and copies completed WAVs into extension cache to satisfy server temp-root enforcement |
