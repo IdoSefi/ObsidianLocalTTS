@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import wave
+from os.path import commonpath, normcase
 from pathlib import Path
 from tempfile import gettempdir
 from typing import Literal, Optional
@@ -56,12 +57,16 @@ def health() -> dict[str, str]:
 @app.post("/synthesize", response_model=SynthesisResponse)
 def synthesize(payload: SynthesisRequest) -> SynthesisResponse:
     session_dir = Path(payload.outputDir).resolve()
-    if not str(session_dir).startswith(str(Path(gettempdir()).resolve())):
+    temp_root = Path(gettempdir()).resolve()
+    if not is_within_temp_dir(session_dir, temp_root):
         return SynthesisResponse(
             sessionId=payload.sessionId,
             sentenceId=payload.sentenceId,
             ok=False,
-            error="outputDir must be under system temp",
+            error=(
+                "outputDir must be under system temp "
+                f"(outputDir={session_dir}, tempRoot={temp_root})"
+            ),
         )
 
     session_dir.mkdir(parents=True, exist_ok=True)
@@ -106,6 +111,16 @@ def synthesize(payload: SynthesisRequest) -> SynthesisResponse:
         ok=True,
         audioPath=str(output_path),
     )
+
+
+def is_within_temp_dir(path: Path, temp_root: Path) -> bool:
+    normalized_path = normcase(str(path.resolve()))
+    normalized_temp = normcase(str(temp_root.resolve()))
+
+    try:
+        return commonpath([normalized_path, normalized_temp]) == normalized_temp
+    except ValueError:
+        return False
 
 
 def get_pipeline_for_voice(voice: str) -> KPipeline:
