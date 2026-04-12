@@ -18,18 +18,44 @@
     "onCommand:localTts.stop",
     "onCommand:localTts.startFromCursor",
     "onCommand:localTts.useKokoroBackend",
-    "onCommand:localTts.usePiperBackend"
+    "onCommand:localTts.usePiperBackend",
+    "onCommand:localTts.openDebugLog"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
-      { "command": "localTts.synthesizeActiveFile", "title": "Local TTS: Synthesize active file" },
-      { "command": "localTts.playActiveFileFromCache", "title": "Local TTS: Play active file from cache" },
-      { "command": "localTts.pauseResume", "title": "Local TTS: Pause / Resume playback" },
-      { "command": "localTts.stop", "title": "Local TTS: Stop playback" },
-      { "command": "localTts.startFromCursor", "title": "Local TTS: Start reading from cursor" },
-      { "command": "localTts.useKokoroBackend", "title": "Local TTS: Use Kokoro backend" },
-      { "command": "localTts.usePiperBackend", "title": "Local TTS: Use Piper backend" }
+      {
+        "command": "localTts.synthesizeActiveFile",
+        "title": "Local TTS: Synthesize active file"
+      },
+      {
+        "command": "localTts.playActiveFileFromCache",
+        "title": "Local TTS: Play active file from cache"
+      },
+      {
+        "command": "localTts.pauseResume",
+        "title": "Local TTS: Pause / Resume playback"
+      },
+      {
+        "command": "localTts.stop",
+        "title": "Local TTS: Stop playback"
+      },
+      {
+        "command": "localTts.startFromCursor",
+        "title": "Local TTS: Start reading from cursor"
+      },
+      {
+        "command": "localTts.useKokoroBackend",
+        "title": "Local TTS: Use Kokoro backend"
+      },
+      {
+        "command": "localTts.usePiperBackend",
+        "title": "Local TTS: Use Piper backend"
+      },
+      {
+        "command": "localTts.openDebugLog",
+        "title": "Local TTS: Open debug log"
+      }
     ],
     "configuration": {
       "title": "Local TTS",
@@ -41,7 +67,10 @@
         },
         "localTts.backend": {
           "type": "string",
-          "enum": ["kokoro", "piper"],
+          "enum": [
+            "kokoro",
+            "piper"
+          ],
           "default": "kokoro",
           "description": "Active synthesis backend"
         },

@@ -24,6 +24,7 @@ Personal-use VS Code desktop extension that reuses this repo's shared local Pyth
    - `Local TTS: Stop playback`
    - `Local TTS: Use Kokoro backend`
    - `Local TTS: Use Piper backend`
+   - `Local TTS: Open debug log`
 
 ## Settings
 - `localTts.serverUrl`
@@ -38,3 +39,6 @@ If F5 fails with `npm.ps1 cannot be loaded because running scripts is disabled`,
 If build fails with `esbuild for another platform` (e.g., `@esbuild/linux-x64` vs `@esbuild/win32-x64`), remove `node_modules` + lockfile and reinstall in the same environment you run VS Code (`npm.cmd install` on Windows, `npm install` in WSL/Linux). The F5 prelaunch task now runs `npm.cmd install --include=optional` before `npm.cmd run build` to refresh platform-specific binaries and ensure optional esbuild packages are installed.
 
 If you still have a broken Linux ELF binary in `node_modules/esbuild/bin/esbuild`, run a one-time clean reinstall in Windows: `rmdir /s /q node_modules && del package-lock.json && npm.cmd install --include=optional`.
+
+## Debugging playback/synthesis
+Open command palette and run `Local TTS: Open debug log` to view the `Local TTS` output channel with step-by-step synth/cache/playback logs and webview playback errors.

@@ -17,3 +17,4 @@
 | VB-006 | P1 | FIXED | Synthesize command failed with `outputDir must be under system temp` when extension sent workspace storage path directly | Fixed by writing server outputs to per-run temp staging then copying sentence WAVs into extension cache |
 | VB-007 | P1 | FIXED | Valid Windows temp paths could be rejected by server due case-sensitive prefix check | Fixed by replacing `startswith` with normalized `commonpath` containment check and better error detail |
 | VB-008 | P1 | FIXED | Windows extension + WSL server failed synthesis due incompatible `outputDir`/path semantics and non-shared temp filesystem | Fixed by server-side interop fallback temp dir plus `audioBase64` payload; extension persists WAV from payload bytes |
+| VB-009 | P2 | FIXED | Playback could appear silent/no-op with no actionable diagnostics in VS Code UI | Fixed by detailed output-channel logging plus surfaced webview playback errors/warnings |
