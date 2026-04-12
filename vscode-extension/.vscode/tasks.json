@@ -4,8 +4,12 @@
     {
       "label": "build-extension",
       "type": "shell",
-      "command": "npm.cmd",
-      "args": ["run", "build"],
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "npm.cmd rebuild esbuild && npm.cmd run build"
+      ],
       "options": {
         "cwd": "${workspaceFolder}"
       },

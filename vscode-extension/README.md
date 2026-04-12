@@ -34,3 +34,5 @@ Personal-use VS Code desktop extension that reuses this repo's shared local Pyth
 
 ### Windows PowerShell note
 If F5 fails with `npm.ps1 cannot be loaded because running scripts is disabled`, use the included task (`.vscode/tasks.json`) which calls `npm.cmd` directly, or run builds from Command Prompt/Git Bash.
+
+If build fails with `esbuild for another platform` (e.g., `@esbuild/linux-x64` vs `@esbuild/win32-x64`), remove `node_modules` + lockfile and reinstall in the same environment you run VS Code (`npm.cmd install` on Windows, `npm install` in WSL/Linux). The F5 prelaunch task now runs `npm.cmd rebuild esbuild` before `npm.cmd run build` to auto-heal common mixed-platform installs.

@@ -16,3 +16,4 @@
 | VF-008 | Markdown preview click mapping | DEFERRED | Out of v1 scope |
 | VF-009 | F5 launch profile for extension-host debugging | COMPLETE | Added workspace `.vscode/launch.json` so users can choose `Run Local TTS Extension` instead of generic debugger selection prompt |
 | VF-010 | Windows-safe F5 prelaunch build task | COMPLETE | Added `build-extension` task that uses `npm.cmd` so extension launch works when PowerShell script execution is restricted |
+| VF-011 | Mixed-platform esbuild recovery in F5 build task | COMPLETE | Windows launch task now rebuilds esbuild binary before build to handle WSL/Windows `node_modules` crossover cases |

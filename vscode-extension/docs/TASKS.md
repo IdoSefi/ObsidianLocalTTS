@@ -16,3 +16,4 @@
 | VSC-009 | Manual smoke test in Extension Development Host | TODO | Planned next |
 | VSC-010 | Add VS Code launch config so F5 directly starts Extension Development Host | DONE | Added `.vscode/launch.json` with `extensionHost` config + preLaunch build |
 | VSC-011 | Avoid PowerShell `npm.ps1` execution-policy failure on F5 prelaunch build | DONE | Added `.vscode/tasks.json` with `npm.cmd run build` and wired launch preLaunchTask to `build-extension` |
+| VSC-012 | Auto-heal common mixed-platform esbuild installs on Windows F5 build | DONE | Updated `build-extension` task to run `npm.cmd rebuild esbuild` before build to recover from Linux/Windows binary mismatch |
