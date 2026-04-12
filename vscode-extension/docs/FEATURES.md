@@ -20,3 +20,4 @@
 | VF-012 | Optional-dependency-safe Windows prelaunch build | COMPLETE | Prelaunch build now ensures optional deps are installed (`include=optional`) to prevent missing `@esbuild/win32-x64` errors |
 | VF-013 | Temp-staging bridge for server outputDir constraint | COMPLETE | Synthesis now targets per-run system-temp folder and copies completed WAVs into extension cache to satisfy server temp-root enforcement |
 | VF-014 | Robust server temp-root guard across Windows path casing | COMPLETE | `/synthesize` temp-root validation now uses normalized common-path logic and returns clearer mismatch diagnostics |
+| VF-015 | Cross-environment audio handoff via response payload | COMPLETE | `/synthesize` now returns `audioBase64` so Windows VS Code + WSL server flows no longer rely on shared filesystem paths |

@@ -30,6 +30,7 @@ export interface SynthesisResponse {
   sentenceId: number;
   ok: boolean;
   audioPath?: string;
+  audioBase64?: string;
   error?: string;
 }
 

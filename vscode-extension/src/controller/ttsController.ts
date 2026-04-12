@@ -133,11 +133,18 @@ export class TtsController {
           outputDir: tempDir,
         });
 
-        if (!response.ok || !response.audioPath) {
+        if (!response.ok) {
           throw new Error(response.error ?? `Synthesis failed for sentence ${sentence.id + 1}`);
         }
 
-        await fs.copyFile(response.audioPath, this.cache.sentenceWavPath(folder, sentence.id));
+        const cachePath = this.cache.sentenceWavPath(folder, sentence.id);
+        if (response.audioBase64) {
+          await fs.writeFile(cachePath, Buffer.from(response.audioBase64, 'base64'));
+        } else if (response.audioPath) {
+          await fs.copyFile(response.audioPath, cachePath);
+        } else {
+          throw new Error(`Synthesis returned no audio payload for sentence ${sentence.id + 1}`);
+        }
       }
 
       await this.cache.writeManifest(folder, buildManifest(filePath, settings.backend, sentences, text));

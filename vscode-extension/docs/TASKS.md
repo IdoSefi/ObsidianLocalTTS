@@ -20,3 +20,4 @@
 | VSC-013 | Ensure optional esbuild platform package is installed during F5 prelaunch build | DONE | Updated build task to run `npm.cmd install --include=optional` before build and added project `.npmrc` (`include=optional`) |
 | VSC-014 | Route synthesis output through system temp staging and copy WAVs into extension cache | DONE | Fixes server `outputDir must be under system temp` restriction while keeping persistent extension storage cache |
 | VSC-015 | Harden server temp-root validation for Windows path casing and clearer diagnostics | DONE | Server now uses normalized common-path check and includes `outputDir`/`tempRoot` in error details |
+| VSC-016 | Remove cross-environment filesystem dependency by consuming server audio payload bytes | DONE | Server now returns `audioBase64`; extension writes WAV bytes directly to cache and falls back to `audioPath` copy when available |

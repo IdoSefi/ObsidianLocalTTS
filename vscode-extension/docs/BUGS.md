@@ -16,3 +16,4 @@
 | VB-005 | P2 | FIXED | F5 build failed when npm optional dependencies were omitted, leaving missing `@esbuild/win32-x64` | Fixed by prelaunch `npm.cmd install --include=optional` and repository `.npmrc` enforcing optional includes |
 | VB-006 | P1 | FIXED | Synthesize command failed with `outputDir must be under system temp` when extension sent workspace storage path directly | Fixed by writing server outputs to per-run temp staging then copying sentence WAVs into extension cache |
 | VB-007 | P1 | FIXED | Valid Windows temp paths could be rejected by server due case-sensitive prefix check | Fixed by replacing `startswith` with normalized `commonpath` containment check and better error detail |
+| VB-008 | P1 | FIXED | Windows extension + WSL server failed synthesis due incompatible `outputDir`/path semantics and non-shared temp filesystem | Fixed by server-side interop fallback temp dir plus `audioBase64` payload; extension persists WAV from payload bytes |
