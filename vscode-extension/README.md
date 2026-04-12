@@ -14,8 +14,9 @@ Personal-use VS Code desktop extension that reuses this repo's shared local Pyth
    - `python server/app.py`
 2. Build extension:
    - `cd vscode-extension && npm install && npm run build`
-3. Open `vscode-extension/` in VS Code and run extension host (`F5`).
-4. Use Command Palette:
+3. Open `vscode-extension/` in VS Code.
+4. Press `F5` and choose `Run Local TTS Extension` (provided by `.vscode/launch.json`) to start an Extension Development Host window.
+5. Use Command Palette:
    - `Local TTS: Synthesize active file`
    - `Local TTS: Play active file from cache`
    - `Local TTS: Start reading from cursor`

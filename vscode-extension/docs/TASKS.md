@@ -14,3 +14,4 @@
 | VSC-007 | Wire end-to-end commands and backend switching | DONE | Includes synth, play from cache, start from cursor |
 | VSC-008 | Add tests for splitter and cursor mapping | TODO | Planned next |
 | VSC-009 | Manual smoke test in Extension Development Host | TODO | Planned next |
+| VSC-010 | Add VS Code launch config so F5 directly starts Extension Development Host | DONE | Added `.vscode/launch.json` with `extensionHost` config + preLaunch build |
