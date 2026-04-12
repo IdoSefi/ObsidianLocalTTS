@@ -31,3 +31,6 @@ Personal-use VS Code desktop extension that reuses this repo's shared local Pyth
 - `localTts.kokoroVoice`
 - `localTts.piperVoice`
 - `localTts.speed`
+
+### Windows PowerShell note
+If F5 fails with `npm.ps1 cannot be loaded because running scripts is disabled`, use the included task (`.vscode/tasks.json`) which calls `npm.cmd` directly, or run builds from Command Prompt/Git Bash.
