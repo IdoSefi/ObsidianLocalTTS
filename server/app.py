@@ -65,7 +65,7 @@ def synthesize(payload: SynthesisRequest) -> SynthesisResponse:
         )
 
     session_dir.mkdir(parents=True, exist_ok=True)
-    output_path = session_dir / f"sentence-{payload.sentenceId:04d}.wav"
+    output_path = session_dir / f"sentence-{payload.sentenceId + 1:04d}.wav"
 
     try:
         if payload.backend == "kokoro":
