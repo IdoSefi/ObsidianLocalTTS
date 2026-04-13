@@ -643,7 +643,22 @@ export default class KokoroTtsPlugin extends Plugin {
           return false;
         }
 
-        if (!result.ok || !result.audioPath) {
+        const returnedSentenceId = result.sentenceId;
+        if (returnedSentenceId !== sentence.id) {
+          sentence.audioState = "error";
+          if (runtimeSentence) {
+            runtimeSentence.audioState = "error";
+          }
+          failedCount += 1;
+          firstFailedSentenceId ??= sentence.id;
+          console.error(
+            `[KokoroTTS] Re-synthesis response sentenceId mismatch for sentence ${sentence.id + 1}: ` +
+              `requested=${sentence.id}, returned=${returnedSentenceId}`,
+          );
+          continue;
+        }
+
+        if (!result.ok || (!result.audioPath && !result.audioBase64)) {
           sentence.audioState = "error";
           if (runtimeSentence) {
             runtimeSentence.audioState = "error";
@@ -655,9 +670,40 @@ export default class KokoroTtsPlugin extends Plugin {
           continue;
         }
 
-        const persistentAudioPath = this.cache.getSentenceAudioAbsolutePath(notePath, backend, sentence.id);
+        const persistentAudioPath = this.cache.getSentenceAudioAbsolutePath(notePath, backend, returnedSentenceId);
         await fs.mkdir(dirname(persistentAudioPath), { recursive: true });
-        await fs.copyFile(result.audioPath, persistentAudioPath);
+        let wrotePersistentAudio = false;
+        let copyFailureReason: string | null = null;
+        if (result.audioPath) {
+          try {
+            await fs.access(result.audioPath);
+            await fs.copyFile(result.audioPath, persistentAudioPath);
+            wrotePersistentAudio = true;
+          } catch (error) {
+            copyFailureReason = error instanceof Error ? error.message : String(error);
+          }
+        }
+
+        if (!wrotePersistentAudio && result.audioBase64) {
+          await fs.writeFile(persistentAudioPath, Buffer.from(result.audioBase64, "base64"));
+          wrotePersistentAudio = true;
+        }
+
+        if (!wrotePersistentAudio) {
+          sentence.audioState = "error";
+          if (runtimeSentence) {
+            runtimeSentence.audioState = "error";
+          }
+          failedCount += 1;
+          firstFailedSentenceId ??= sentence.id;
+          const sourcePath = result.audioPath ?? "missing";
+          console.error(
+            `[KokoroTTS] Re-synthesis output missing for sentence ${sentence.id + 1}: source=${sourcePath}, ` +
+              `destination=${persistentAudioPath}, copyError=${copyFailureReason ?? "n/a"}`,
+          );
+          continue;
+        }
+
         if ((runId !== undefined && !this.isCommandRunCurrent(runId)) || !this.isSynthesisRunCurrent(synthesisRunId)) {
           return false;
         }

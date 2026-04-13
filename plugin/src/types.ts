@@ -48,6 +48,7 @@ export interface SynthesisResponse {
   sessionId: string;
   sentenceId: number;
   audioPath?: string;
+  audioBase64?: string;
   ok: boolean;
   error?: string;
 }
