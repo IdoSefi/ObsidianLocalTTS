@@ -1,5 +1,5 @@
 import { existsSync, promises as fs, readFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { MarkdownView, Notice, Plugin } from "obsidian";
 import { VaultAudioCache } from "./audio/cache";
 import { LocalTtsClient } from "./audio/kokoroClient";
@@ -655,9 +655,25 @@ export default class KokoroTtsPlugin extends Plugin {
           continue;
         }
 
+        const resolvedSynthAudioPath = resolveSynthesizedAudioPath(result.audioPath, sentence.id);
+        if (!resolvedSynthAudioPath) {
+          sentence.audioState = "error";
+          if (runtimeSentence) {
+            runtimeSentence.audioState = "error";
+          }
+          failedCount += 1;
+          firstFailedSentenceId ??= sentence.id;
+          console.error(
+            `[KokoroTTS] Re-synthesis failed for sentence ${sentence.id + 1}: synthesized WAV missing at ${
+              result.audioPath
+            }`,
+          );
+          continue;
+        }
+
         const persistentAudioPath = this.cache.getSentenceAudioAbsolutePath(notePath, backend, sentence.id);
         await fs.mkdir(dirname(persistentAudioPath), { recursive: true });
-        await fs.copyFile(result.audioPath, persistentAudioPath);
+        await fs.copyFile(resolvedSynthAudioPath, persistentAudioPath);
         if ((runId !== undefined && !this.isCommandRunCurrent(runId)) || !this.isSynthesisRunCurrent(synthesisRunId)) {
           return false;
         }
@@ -857,6 +873,25 @@ function isLikelyPlayableWav(audioPath: string): boolean {
   } catch {
     return false;
   }
+}
+
+function resolveSynthesizedAudioPath(serverAudioPath: string, sentenceId: number): string | null {
+  if (existsSync(serverAudioPath)) {
+    return serverAudioPath;
+  }
+
+  const parent = dirname(serverAudioPath);
+  const oneBasedFallback = join(parent, `sentence-${String(sentenceId + 1).padStart(4, "0")}.wav`);
+  if (existsSync(oneBasedFallback)) {
+    return oneBasedFallback;
+  }
+
+  const zeroBasedFallback = join(parent, `sentence-${String(sentenceId).padStart(4, "0")}.wav`);
+  if (existsSync(zeroBasedFallback)) {
+    return zeroBasedFallback;
+  }
+
+  return null;
 }
 
 function minNonNull(left: number | null, right: number | null): number | null {
