@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import base64
 import os
 import shutil
 import subprocess
 import wave
+from os.path import commonpath, normcase
 from pathlib import Path
 from tempfile import gettempdir
 from typing import Literal, Optional
@@ -45,6 +47,7 @@ class SynthesisResponse(BaseModel):
     sentenceId: int
     ok: bool
     audioPath: Optional[str] = None
+    audioBase64: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -55,14 +58,12 @@ def health() -> dict[str, str]:
 
 @app.post("/synthesize", response_model=SynthesisResponse)
 def synthesize(payload: SynthesisRequest) -> SynthesisResponse:
-    session_dir = Path(payload.outputDir).resolve()
-    if not str(session_dir).startswith(str(Path(gettempdir()).resolve())):
-        return SynthesisResponse(
-            sessionId=payload.sessionId,
-            sentenceId=payload.sentenceId,
-            ok=False,
-            error="outputDir must be under system temp",
-        )
+    temp_root = Path(gettempdir()).resolve()
+    requested_output_dir = Path(payload.outputDir).resolve()
+    if is_within_temp_dir(requested_output_dir, temp_root):
+        session_dir = requested_output_dir
+    else:
+        session_dir = (CACHE_ROOT / "interop" / payload.sessionId).resolve()
 
     session_dir.mkdir(parents=True, exist_ok=True)
     output_path = session_dir / f"sentence-{payload.sentenceId:04d}.wav"
@@ -100,12 +101,24 @@ def synthesize(payload: SynthesisRequest) -> SynthesisResponse:
             error=f"{payload.backend.title()} synthesis failed: unexpected server error ({exc})",
         )
 
+    audio_bytes = output_path.read_bytes()
     return SynthesisResponse(
         sessionId=payload.sessionId,
         sentenceId=payload.sentenceId,
         ok=True,
         audioPath=str(output_path),
+        audioBase64=base64.b64encode(audio_bytes).decode("ascii"),
     )
+
+
+def is_within_temp_dir(path: Path, temp_root: Path) -> bool:
+    normalized_path = normcase(str(path.resolve()))
+    normalized_temp = normcase(str(temp_root.resolve()))
+
+    try:
+        return commonpath([normalized_path, normalized_temp]) == normalized_temp
+    except ValueError:
+        return False
 
 
 def get_pipeline_for_voice(voice: str) -> KPipeline:

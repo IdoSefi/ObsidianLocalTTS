@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build-extension",
+      "type": "shell",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "npm.cmd install --include=optional --no-audit --no-fund && npm.cmd run build"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

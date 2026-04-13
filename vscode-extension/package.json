@@ -1,0 +1,106 @@
+{
+  "name": "local-tts-vscode-extension",
+  "displayName": "Local TTS",
+  "description": "Personal-use VS Code extension for local sentence-level TTS via shared localhost server",
+  "version": "0.0.1",
+  "publisher": "local",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:localTts.synthesizeActiveFile",
+    "onCommand:localTts.playActiveFileFromCache",
+    "onCommand:localTts.pauseResume",
+    "onCommand:localTts.stop",
+    "onCommand:localTts.startFromCursor",
+    "onCommand:localTts.useKokoroBackend",
+    "onCommand:localTts.usePiperBackend",
+    "onCommand:localTts.openDebugLog"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "localTts.synthesizeActiveFile",
+        "title": "Local TTS: Synthesize active file"
+      },
+      {
+        "command": "localTts.playActiveFileFromCache",
+        "title": "Local TTS: Play active file from cache"
+      },
+      {
+        "command": "localTts.pauseResume",
+        "title": "Local TTS: Pause / Resume playback"
+      },
+      {
+        "command": "localTts.stop",
+        "title": "Local TTS: Stop playback"
+      },
+      {
+        "command": "localTts.startFromCursor",
+        "title": "Local TTS: Start reading from cursor"
+      },
+      {
+        "command": "localTts.useKokoroBackend",
+        "title": "Local TTS: Use Kokoro backend"
+      },
+      {
+        "command": "localTts.usePiperBackend",
+        "title": "Local TTS: Use Piper backend"
+      },
+      {
+        "command": "localTts.openDebugLog",
+        "title": "Local TTS: Open debug log"
+      }
+    ],
+    "configuration": {
+      "title": "Local TTS",
+      "properties": {
+        "localTts.serverUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8765",
+          "description": "Base URL of the shared local TTS server"
+        },
+        "localTts.backend": {
+          "type": "string",
+          "enum": [
+            "kokoro",
+            "piper"
+          ],
+          "default": "kokoro",
+          "description": "Active synthesis backend"
+        },
+        "localTts.kokoroVoice": {
+          "type": "string",
+          "default": "af_bella",
+          "description": "Kokoro voice used when backend is kokoro"
+        },
+        "localTts.piperVoice": {
+          "type": "string",
+          "default": "en_US-lessac-high",
+          "description": "Fixed Piper voice for v1"
+        },
+        "localTts.speed": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 0.1,
+          "description": "Speech speed multiplier"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.25.4",
+    "typescript": "^5.4.5"
+  }
+}
